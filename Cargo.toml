@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "crates/nodaris-core",
+    "crates/nodaris-linux",
+    "apps/nodaris-server",
+    "apps/nodaris-desktop/src-tauri"
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Общие зависимости для всех крейтов
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
