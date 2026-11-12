@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Наши внутренние крейты
 nodaris-core = { path = "../../crates/nodaris-core" }
 nodaris-linux = { path = "../../crates/nodaris-linux" }
 

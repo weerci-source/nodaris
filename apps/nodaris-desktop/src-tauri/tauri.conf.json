@@ -6,15 +6,15 @@
   "build": {
     "frontendDist": "../../ui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "cd ../../ui && npm run dev",
+    "beforeBuildCommand": "cd ../../ui && npm run build"
   },
   "app": {
     "windows": [
       {
         "title": "Nodaris Network Analyzer",
-        "width": 800,
-        "height": 600,
+        "width": 1000,
+        "height": 700,
         "resizable": true,
         "fullscreen": false
       }

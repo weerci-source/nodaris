@@ -3,14 +3,28 @@
   "tasks": [
     {
       "label": "dev",
-      "dependsOn": ["server", "ui"],
+      "dependsOn": ["tauri"],
       "dependsOrder": "parallel",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
-        "panel": "shared",
-        "group": "dev"
+        "panel": "shared"
       }
+    },
+    {
+      "label": "dev:browser",
+      "dependsOn": ["server", "ui"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "tauri",
+      "type": "shell",
+      "command": "npx tauri dev",
+      "options": { "cwd": "${workspaceFolder}/apps/nodaris-desktop" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "dev" }
     },
     {
       "label": "server",
