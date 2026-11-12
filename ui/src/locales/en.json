@@ -1,0 +1,6 @@
+{
+    "unknown_error": "An unknown error occurred. Please try again.",
+    "scan_wifi_permission_denied": "Wi-Fi access denied. Make sure NetworkManager is running and you have permissions.",
+    "scan_interface_down": "Network interface is down. Please enable Wi-Fi.",
+    "scan_unknown_failure": "Failed to scan networks."
+}

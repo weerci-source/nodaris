@@ -1,0 +1,80 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev",
+      "dependsOn": ["server", "ui"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "dev"
+      }
+    },
+    {
+      "label": "server",
+      "type": "shell",
+      "command": "cargo run -p nodaris-server",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rust",
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Nodaris server running",
+          "endsPattern": "(panic|error\\[)"
+        }
+      },
+      "presentation": { "panel": "dedicated", "group": "dev" }
+    },
+    {
+      "label": "ui",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/ui" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "dev" }
+    },
+    {
+      "label": "build",
+      "dependsOn": ["build:ui", "build:rust"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "build:ui",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/ui" },
+      "problemMatcher": []
+    },
+    {
+      "label": "build:rust",
+      "type": "shell",
+      "command": "cargo build --workspace",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "check",
+      "dependsOn": ["check:ui", "check:rust"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "check:ui",
+      "type": "shell",
+      "command": "npm run check",
+      "options": { "cwd": "${workspaceFolder}/ui" },
+      "problemMatcher": []
+    },
+    {
+      "label": "check:rust",
+      "type": "shell",
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "problemMatcher": ["$rustc"]
+    }
+  ]
+}

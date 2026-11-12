@@ -1,0 +1,19 @@
+{
+    "cppFileMerger.excludePatterns": [
+        "**/assets",
+        "**/third_party",
+        "**/key",
+        "**/.vscode",
+        "**/*.svg",
+        "**/tests"
+    ],
+    "files.watcherExclude": {
+        "**/target/**": true,
+    },
+    "files.exclude": {
+        "**/target": true,
+        "Cargo.lock": true,
+        "**/dist": true,
+        "**/node_modules": true
+    },
+}
