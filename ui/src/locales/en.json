@@ -1,6 +1,25 @@
 {
+    "app_subtitle": "Network Scanner",
     "unknown_error": "An unknown error occurred. Please try again.",
-    "scan_wifi_permission_denied": "Wi-Fi access denied. Make sure NetworkManager is running and you have permissions.",
-    "scan_interface_down": "Network interface is down. Please enable Wi-Fi.",
-    "scan_unknown_failure": "Failed to scan networks."
+    "scan_wifi_permission_denied": "Wi-Fi access denied.",
+    "scan_interface_down": "Network interface is down.",
+    "scan_unknown_failure": "Failed to scan networks.",
+    "scan_btn": "Scan Again",
+    "scanning_btn": "Scanning...",
+    "scanning_air": "Scanning airwaves...",
+    "no_networks": "No networks found.",
+    "table_ssid": "SSID",
+    "table_bssid": "BSSID (MAC)",
+    "table_band": "Band",
+    "table_signal": "Signal",
+    "table_diag": "Diagnostics",
+    "band_5g": "5 GHz",
+    "band_24g": "2.4 GHz",
+    "band_6g": "6 GHz",
+    "band_unknown": "Unknown",
+    "label_snr": "SNR:",
+    "label_noise": "Noise:",
+    "unit_db": "dB",
+    "unit_dbm": "dBm",
+    "label_no_noise": "No noise data"
 }

@@ -5,6 +5,7 @@
         "**/key",
         "**/.vscode",
         "**/*.svg",
+        "**/*.png",
         "**/tests"
     ],
     "files.watcherExclude": {
