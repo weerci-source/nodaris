@@ -1,6 +1,25 @@
 {
+    "app_subtitle": "Сканер сетей",
     "unknown_error": "Произошла неизвестная ошибка. Попробуйте позже.",
-    "scan_wifi_permission_denied": "Отказано в доступе к Wi-Fi. Убедитесь, что NetworkManager запущен и у вас есть права.",
-    "scan_interface_down": "Сетевой интерфейс выключен. Включите Wi-Fi.",
-    "scan_unknown_failure": "Не удалось выполнить сканирование сетей."
+    "scan_wifi_permission_denied": "Отказано в доступе к Wi-Fi.",
+    "scan_interface_down": "Сетевой интерфейс выключен.",
+    "scan_unknown_failure": "Не удалось выполнить сканирование сетей.",
+    "scan_btn": "Сканировать заново",
+    "scanning_btn": "Сканирование...",
+    "scanning_air": "Сканирование эфира...",
+    "no_networks": "Сети не найдены.",
+    "table_ssid": "SSID",
+    "table_bssid": "BSSID (MAC)",
+    "table_band": "Диапазон",
+    "table_signal": "Сигнал",
+    "table_diag": "Диагностика",
+    "band_5g": "5 ГГц",
+    "band_24g": "2.4 ГГц",
+    "band_6g": "6 ГГц",
+    "band_unknown": "Неизвестно",
+    "label_snr": "SNR:",
+    "label_noise": "Шум:",
+    "unit_db": "дБ",
+    "unit_dbm": "дБм",
+    "label_no_noise": "Нет данных о шуме"
 }

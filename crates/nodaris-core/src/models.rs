@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 pub struct AccessPoint {
     pub ssid: String,
     pub bssid: String,
-    pub signal: i32,    // RSSI в dBm
-    pub frequency: u32, // MHz
+    pub signal: i32,
+    pub frequency: u32,
+    pub noise: Option<i32>,
+    pub snr: Option<i32>,
+    pub is_active: bool, 
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Scanner from "./lib/features/scanner/Scanner.svelte";
+  import { t } from "./lib/i18n";
 </script>
 
 <main
@@ -10,7 +11,7 @@
   >
     <h1 style="margin: 0;">
       Nodaris <span style="color: var(--color-primary); font-size: 0.6em;"
-        >Network Scanner</span
+        >{t("app_subtitle")}</span
       >
     </h1>
   </header>
