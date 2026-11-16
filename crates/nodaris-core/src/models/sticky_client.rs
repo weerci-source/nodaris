@@ -20,6 +20,9 @@ pub struct StickyClientConfig {
 
     /// Максимальный возраст измерения RSSI.
     pub max_measurement_age_ns: u64,
+
+    /// Максимальный интервал между последовательными наблюдениями.
+    pub max_observation_gap_ns: u64,
 }
 
 impl Default for StickyClientConfig {
@@ -29,6 +32,7 @@ impl Default for StickyClientConfig {
             min_consecutive_observations: 3,
             min_duration_ns: 30_000_000_000,
             max_measurement_age_ns: 10_000_000_000,
+            max_observation_gap_ns: 20_000_000_000,
         }
     }
 }
@@ -43,6 +47,7 @@ pub enum StickyClientUnavailableReason {
     DifferentSources,
     DifferentSessions,
     NonIncreasingTime,
+    ObservationGapExceeded,
     ConnectionUnavailable,
     NotConnected,
     ConnectionChanged,
@@ -251,6 +256,7 @@ pub fn assess_sticky_client(
         || config.min_consecutive_observations < 2
         || config.min_duration_ns == 0
         || config.max_measurement_age_ns == 0
+        || config.max_observation_gap_ns == 0
     {
         return StickyClientAssessment::InsufficientData(
             StickyClientUnavailableReason::InvalidConfiguration,
@@ -289,11 +295,18 @@ pub fn assess_sticky_client(
         if index > 0 {
             let previous = &observations[index - 1];
 
-            if observation.state.observed_at.monotonic_time_ns
-                <= previous.state.observed_at.monotonic_time_ns
-            {
+            let current_time = observation.state.observed_at.monotonic_time_ns;
+            let previous_time = previous.state.observed_at.monotonic_time_ns;
+
+            if current_time <= previous_time {
                 return StickyClientAssessment::InsufficientData(
                     StickyClientUnavailableReason::NonIncreasingTime,
+                );
+            }
+
+            if current_time - previous_time > config.max_observation_gap_ns {
+                return StickyClientAssessment::InsufficientData(
+                    StickyClientUnavailableReason::ObservationGapExceeded,
                 );
             }
         }
@@ -836,5 +849,63 @@ mod tests {
                 StickyClientUnavailableReason::InvalidConfiguration,
             ),
         );
+    }
+
+    #[test]
+    fn accepts_current_rssi_within_future_tolerance() {
+        let mut observations = stable_observations();
+
+        set_current_rssi(
+            &mut observations[1],
+            Some(rssi_measurement(-70, SOURCE, 25_000_000_000)),
+        );
+
+        assert!(matches!(
+            assess_sticky_client(&observations, &config()),
+            StickyClientAssessment::Suspected(_),
+        ));
+    }
+
+    #[test]
+    fn accepts_neighbor_rssi_within_past_tolerance() {
+        let mut observations = stable_observations();
+
+        observations[1].neighbors.state =
+            MeasurementState::Available(vec![candidate(5_000_000_000, -60)]);
+
+        assert!(matches!(
+            assess_sticky_client(&observations, &config()),
+            StickyClientAssessment::Suspected(_),
+        ));
+    }
+
+    #[test]
+    fn rejects_excessive_observation_gap() {
+        let observations = vec![
+            observation(0, -70, vec![candidate(0, -60)]),
+            observation(15_000_000_000, -70, vec![candidate(15_000_000_000, -60)]),
+            observation(60_000_000_000, -70, vec![candidate(60_000_000_000, -60)]),
+        ];
+
+        assert_eq!(
+            assess_sticky_client(&observations, &config()),
+            StickyClientAssessment::InsufficientData(
+                StickyClientUnavailableReason::ObservationGapExceeded,
+            ),
+        );
+    }
+
+    #[test]
+    fn accepts_observation_gap_at_exact_limit() {
+        let observations = vec![
+            observation(0, -70, vec![candidate(0, -60)]),
+            observation(20_000_000_000, -70, vec![candidate(20_000_000_000, -60)]),
+            observation(40_000_000_000, -70, vec![candidate(40_000_000_000, -60)]),
+        ];
+
+        assert!(matches!(
+            assess_sticky_client(&observations, &config()),
+            StickyClientAssessment::Suspected(_),
+        ));
     }
 }
