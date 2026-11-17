@@ -69,6 +69,19 @@ pub struct NeighborMeasurementIssue {
     pub reason: StickyClientUnavailableReason,
 }
 
+/// Проблема измерения соседней AP с привязкой к наблюдению.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObservedNeighborIssue {
+    /// Индекс наблюдения во входной последовательности (с нуля).
+    pub observation_index: usize,
+
+    /// Монотонное время наблюдения внутри сессии.
+    pub monotonic_time_ns: u64,
+
+    /// Проблема измерения.
+    pub issue: NeighborMeasurementIssue,
+}
+
 /// Доказательства потенциального Sticky Client.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StickyClientEvidence {
@@ -100,4 +113,17 @@ pub enum StickyClientAssessment {
     InsufficientData(StickyClientUnavailableReason),
     NoEvidence,
     Suspected(StickyClientEvidence),
+}
+
+/// Подробный результат диагностики Sticky Client.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StickyClientReport {
+    /// Итоговая диагностическая оценка.
+    pub assessment: StickyClientAssessment,
+
+    /// Количество наблюдений, переданных на анализ.
+    pub observation_count: usize,
+
+    /// Проблемы измерений соседних точек доступа.
+    pub neighbor_issues: Vec<ObservedNeighborIssue>,
 }

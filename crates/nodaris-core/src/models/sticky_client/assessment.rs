@@ -1,11 +1,53 @@
 use super::super::connection::ConnectionObservation;
 
 use super::sample::{Sample, extract_sample};
+use super::types::ObservedNeighborIssue;
 use super::{
-    StickyClientAssessment, StickyClientConfig, StickyClientEvidence, StickyClientUnavailableReason,
+    StickyClientAssessment, StickyClientConfig, StickyClientEvidence, StickyClientReport,
+    StickyClientUnavailableReason,
 };
 
 /// Оценивает наличие признаков Sticky Client по последовательности снимков.
+///
+/// Сохраняет прежний публичный API, возвращающий только итоговую оценку.
+pub fn assess_sticky_client(
+    observations: &[ConnectionObservation],
+    config: &StickyClientConfig,
+) -> StickyClientAssessment {
+    assess_sticky_client_report(observations, config).assessment
+}
+
+/// Формирует подробный диагностический отчёт Sticky Client.
+pub fn assess_sticky_client_report(
+    observations: &[ConnectionObservation],
+    config: &StickyClientConfig,
+) -> StickyClientReport {
+    let mut samples = Vec::with_capacity(observations.len());
+
+    let assessment = assess_with_samples(observations, config, &mut samples);
+
+    let neighbor_issues = samples
+        .into_iter()
+        .enumerate()
+        .flat_map(|(observation_index, sample)| {
+            sample
+                .neighbor_issues
+                .into_iter()
+                .map(move |issue| ObservedNeighborIssue {
+                    observation_index,
+                    monotonic_time_ns: sample.monotonic_time_ns,
+                    issue,
+                })
+        })
+        .collect();
+    StickyClientReport {
+        assessment,
+        observation_count: observations.len(),
+        neighbor_issues,
+    }
+}
+
+/// Внутренний алгоритм оценки Sticky Client.
 ///
 /// Для положительного результата необходимы:
 /// - одна и та же подключённая AP;
@@ -14,9 +56,12 @@ use super::{
 /// - преимущество соседней AP не меньше заданного порога;
 /// - необходимое количество последовательных наблюдений;
 /// - необходимая продолжительность наблюдения.
-pub fn assess_sticky_client(
+///
+/// Успешно принятые образцы сохраняются в `samples` для отчёта.
+fn assess_with_samples(
     observations: &[ConnectionObservation],
     config: &StickyClientConfig,
+    samples: &mut Vec<Sample>,
 ) -> StickyClientAssessment {
     if config.min_signal_advantage_db <= 0
         || config.min_consecutive_observations < 2
@@ -36,8 +81,6 @@ pub fn assess_sticky_client(
     }
 
     let first = &observations[0];
-
-    let mut samples: Vec<Sample> = Vec::with_capacity(observations.len());
 
     for (index, observation) in observations.iter().enumerate() {
         if observation.interface != first.interface {
@@ -117,7 +160,7 @@ pub fn assess_sticky_client(
         let mut minimum_advantage = i32::MAX;
         let mut stable = true;
 
-        for sample in &samples {
+        for sample in samples.iter() {
             let Some(neighbor) = sample
                 .neighbors
                 .iter()

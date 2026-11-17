@@ -480,3 +480,209 @@ fn accepts_observation_gap_at_exact_limit() {
         StickyClientAssessment::Suspected(_),
     ));
 }
+
+#[test]
+fn report_no_evidence_has_no_neighbor_issues() {
+    let observations = [0, 15_000_000_000, 30_000_000_000]
+        .into_iter()
+        .map(|at_ns| observation(at_ns, -70, vec![candidate(at_ns, -61)]))
+        .collect::<Vec<_>>();
+
+    let report = assess_sticky_client_report(&observations, &config());
+
+    assert_eq!(report.assessment, StickyClientAssessment::NoEvidence);
+    assert_eq!(report.observation_count, 3);
+    assert!(report.neighbor_issues.is_empty());
+}
+
+#[test]
+fn report_suspected_preserves_other_neighbor_issues() {
+    const UNAVAILABLE_BSSID: &str = "AA:BB:CC:00:00:03";
+
+    let times = [0, 15_000_000_000, 30_000_000_000];
+
+    let observations = times
+        .into_iter()
+        .map(|at_ns| {
+            observation(
+                at_ns,
+                -70,
+                vec![candidate(at_ns, -60), neighbor(UNAVAILABLE_BSSID, None)],
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let report = assess_sticky_client_report(&observations, &config());
+
+    assert!(matches!(
+        report.assessment,
+        StickyClientAssessment::Suspected(_)
+    ));
+
+    assert_eq!(report.observation_count, 3);
+    assert_eq!(report.neighbor_issues.len(), 3);
+
+    for (index, observed_issue) in report.neighbor_issues.iter().enumerate() {
+        assert_eq!(observed_issue.observation_index, index);
+        assert_eq!(observed_issue.monotonic_time_ns, times[index]);
+
+        assert_eq!(
+            observed_issue.issue.bssid,
+            Bssid(UNAVAILABLE_BSSID.to_string())
+        );
+
+        assert_eq!(
+            observed_issue.issue.reason,
+            StickyClientUnavailableReason::NeighborRssiUnavailable
+        );
+    }
+}
+
+#[test]
+fn report_insufficient_data_preserves_neighbor_issues() {
+    let times = [0, 15_000_000_000, 30_000_000_000];
+
+    let observations = times
+        .into_iter()
+        .map(|at_ns| observation(at_ns, -70, vec![neighbor(CANDIDATE_BSSID, None)]))
+        .collect::<Vec<_>>();
+
+    let report = assess_sticky_client_report(&observations, &config());
+
+    assert_eq!(
+        report.assessment,
+        StickyClientAssessment::InsufficientData(
+            StickyClientUnavailableReason::NeighborRssiUnavailable
+        )
+    );
+
+    assert_eq!(report.observation_count, 3);
+    assert_eq!(report.neighbor_issues.len(), 3);
+
+    for (index, observed_issue) in report.neighbor_issues.iter().enumerate() {
+        assert_eq!(observed_issue.observation_index, index);
+        assert_eq!(observed_issue.monotonic_time_ns, times[index]);
+
+        assert_eq!(
+            observed_issue.issue.bssid,
+            Bssid(CANDIDATE_BSSID.to_string())
+        );
+
+        assert_eq!(
+            observed_issue.issue.reason,
+            StickyClientUnavailableReason::NeighborRssiUnavailable
+        );
+    }
+}
+
+#[test]
+fn report_early_termination_preserves_accepted_neighbor_issues() {
+    const UNAVAILABLE_BSSID: &str = "AA:BB:CC:00:00:03";
+
+    let mut observations = stable_observations();
+
+    observations[0].neighbors.state =
+        MeasurementState::Available(vec![candidate(0, -60), neighbor(UNAVAILABLE_BSSID, None)]);
+
+    // Второе наблюдение имеет то же время, что и первое.
+    // Анализ должен завершиться до извлечения второго образца.
+    observations[1].state.observed_at.monotonic_time_ns = 0;
+
+    let report = assess_sticky_client_report(&observations, &config());
+
+    assert_eq!(
+        report.assessment,
+        StickyClientAssessment::InsufficientData(StickyClientUnavailableReason::NonIncreasingTime)
+    );
+
+    // Передано три наблюдения, но принят только первый образец.
+    assert_eq!(report.observation_count, 3);
+    assert_eq!(report.neighbor_issues.len(), 1);
+
+    let observed_issue = &report.neighbor_issues[0];
+
+    assert_eq!(observed_issue.observation_index, 0);
+    assert_eq!(observed_issue.monotonic_time_ns, 0);
+
+    assert_eq!(
+        observed_issue.issue.bssid,
+        Bssid(UNAVAILABLE_BSSID.to_string())
+    );
+
+    assert_eq!(
+        observed_issue.issue.reason,
+        StickyClientUnavailableReason::NeighborRssiUnavailable
+    );
+}
+
+#[test]
+fn report_invalid_configuration_does_not_process_observations() {
+    let observations = stable_observations();
+
+    let mut invalid_config = config();
+    invalid_config.min_signal_advantage_db = 0;
+
+    let report = assess_sticky_client_report(&observations, &invalid_config);
+
+    assert_eq!(
+        report.assessment,
+        StickyClientAssessment::InsufficientData(
+            StickyClientUnavailableReason::InvalidConfiguration
+        )
+    );
+
+    assert_eq!(report.observation_count, observations.len());
+    assert!(report.neighbor_issues.is_empty());
+}
+
+#[test]
+fn report_preserves_multiple_neighbor_issues_in_same_observation() {
+    const FIRST_BSSID: &str = "AA:BB:CC:00:00:03";
+    const SECOND_BSSID: &str = "AA:BB:CC:00:00:04";
+
+    let observations = [0, 15_000_000_000, 30_000_000_000]
+        .into_iter()
+        .map(|at_ns| {
+            let mut neighbors = vec![candidate(at_ns, -60)];
+
+            if at_ns == 15_000_000_000 {
+                neighbors.push(neighbor(FIRST_BSSID, None));
+                neighbors.push(neighbor(SECOND_BSSID, None));
+            }
+
+            observation(at_ns, -70, neighbors)
+        })
+        .collect::<Vec<_>>();
+
+    let report = assess_sticky_client_report(&observations, &config());
+
+    assert!(matches!(
+        report.assessment,
+        StickyClientAssessment::Suspected(_)
+    ));
+
+    assert_eq!(report.observation_count, 3);
+    assert_eq!(report.neighbor_issues.len(), 2);
+
+    let first = &report.neighbor_issues[0];
+    let second = &report.neighbor_issues[1];
+
+    assert_eq!(first.observation_index, 1);
+    assert_eq!(second.observation_index, 1);
+
+    assert_eq!(first.monotonic_time_ns, 15_000_000_000);
+    assert_eq!(second.monotonic_time_ns, 15_000_000_000);
+
+    assert_eq!(first.issue.bssid, Bssid(FIRST_BSSID.to_string()));
+    assert_eq!(second.issue.bssid, Bssid(SECOND_BSSID.to_string()));
+
+    assert_eq!(
+        first.issue.reason,
+        StickyClientUnavailableReason::NeighborRssiUnavailable
+    );
+
+    assert_eq!(
+        second.issue.reason,
+        StickyClientUnavailableReason::NeighborRssiUnavailable
+    );
+}
