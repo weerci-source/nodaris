@@ -17,8 +17,5 @@ pub struct ConnectionState {
 pub trait ConnectionMonitor: Send + Sync {
     fn provider_info(&self) -> &ProviderInfo;
 
-    async fn current_state(
-        &self,
-        interface_id: &str,
-    ) -> Result<ConnectionState, CoreError>;
+    async fn current_state(&self, interface_id: &str) -> Result<ConnectionState, CoreError>;
 }

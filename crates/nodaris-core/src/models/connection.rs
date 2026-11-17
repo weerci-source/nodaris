@@ -129,18 +129,14 @@ pub fn detect_roaming(
     let previous_state = match &previous.state.state {
         MeasurementState::Available(state) => state,
         MeasurementState::Unavailable(reason) => {
-            return Err(RoamingUnavailableReason::PreviousStateUnavailable(
-                *reason,
-            ));
+            return Err(RoamingUnavailableReason::PreviousStateUnavailable(*reason));
         }
     };
 
     let current_state = match &current.state.state {
         MeasurementState::Available(state) => state,
         MeasurementState::Unavailable(reason) => {
-            return Err(RoamingUnavailableReason::CurrentStateUnavailable(
-                *reason,
-            ));
+            return Err(RoamingUnavailableReason::CurrentStateUnavailable(*reason));
         }
     };
 

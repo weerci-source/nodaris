@@ -11,7 +11,7 @@ fn split_escaped(input: &str, delim: char) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut chars = input.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '\\' {
             if let Some(&next) = chars.peek() {
@@ -36,31 +36,52 @@ fn split_escaped(input: &str, delim: char) -> Vec<String> {
 pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
     // Запрашиваем IN-USE (активна ли сеть) прямо в списке сетей
     let output = Command::new("nmcli")
-        .args(["-t", "-f", "IN-USE,SSID,BSSID,SIGNAL,FREQ", "dev", "wifi", "list"])
+        .args([
+            "-t",
+            "-f",
+            "IN-USE,SSID,BSSID,SIGNAL,FREQ",
+            "dev",
+            "wifi",
+            "list",
+        ])
         .output()
         .map_err(|e| {
-            CoreError::new(keys::scan::UNKNOWN_FAILURE, ErrorCode::HardwareError, ErrorSeverity::Error)
-                .with_tech(format!("Failed to execute nmcli: {}", e))
+            CoreError::new(
+                keys::scan::UNKNOWN_FAILURE,
+                ErrorCode::HardwareError,
+                ErrorSeverity::Error,
+            )
+            .with_tech(format!("Failed to execute nmcli: {}", e))
         })?;
 
     if !output.status.success() {
         let err_msg = String::from_utf8_lossy(&output.stderr);
-        let error_key = if err_msg.contains("Not authorized") || err_msg.contains("Permission denied") {
-            keys::scan::WIFI_PERMISSION_DENIED
-        } else {
-            keys::scan::UNKNOWN_FAILURE
-        };
-        return Err(CoreError::new(error_key, ErrorCode::PermissionDenied, ErrorSeverity::Error)
-            .with_tech(err_msg.to_string()));
+        let error_key =
+            if err_msg.contains("Not authorized") || err_msg.contains("Permission denied") {
+                keys::scan::WIFI_PERMISSION_DENIED
+            } else {
+                keys::scan::UNKNOWN_FAILURE
+            };
+        return Err(
+            CoreError::new(error_key, ErrorCode::PermissionDenied, ErrorSeverity::Error)
+                .with_tech(err_msg.to_string()),
+        );
     }
 
     // Получаем реальный сигнал и шум для активного интерфейса из /proc/net/wireless
     let mut real_sig = None;
     let mut real_noise = None;
 
-    if let Ok(out) = Command::new("nmcli").args(["-t", "-f", "DEVICE,TYPE", "device"]).output() {
+    if let Ok(out) = Command::new("nmcli")
+        .args(["-t", "-f", "DEVICE,TYPE", "device"])
+        .output()
+    {
         let s = String::from_utf8_lossy(&out.stdout);
-        if let Some(iface) = s.lines().find(|l| l.contains(":wifi")).map(|l| l.split(':').next().unwrap_or("")) {
+        if let Some(iface) = s
+            .lines()
+            .find(|l| l.contains(":wifi"))
+            .map(|l| l.split(':').next().unwrap_or(""))
+        {
             if let Ok(content) = fs::read_to_string("/proc/net/wireless") {
                 for line in content.lines().skip(2) {
                     if line.trim().starts_with(&format!("{}:", iface)) {
@@ -68,10 +89,16 @@ pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
                         if parts.len() >= 5 {
                             let sig_str = parts[3].trim_end_matches('.');
                             let noise_str = parts[4].trim_end_matches('.');
-                            if let (Ok(sig), Ok(noise)) = (sig_str.parse::<i32>(), noise_str.parse::<i32>()) {
+                            if let (Ok(sig), Ok(noise)) =
+                                (sig_str.parse::<i32>(), noise_str.parse::<i32>())
+                            {
                                 real_sig = Some(sig);
                                 // Отбрасываем мусор (0 или -256)
-                                real_noise = if noise < 0 && noise > -120 { Some(noise) } else { None };
+                                real_noise = if noise < 0 && noise > -120 {
+                                    Some(noise)
+                                } else {
+                                    None
+                                };
                             }
                         }
                     }
@@ -85,14 +112,19 @@ pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
 
     for line in stdout.lines() {
         let parts = split_escaped(line, ':');
-        
+
         // Теперь у нас 5 частей: IN-USE, SSID, BSSID, SIGNAL, FREQ
         if parts.len() >= 5 {
             let in_use = parts[0].trim() == "*" || parts[0].trim() == "yes";
             let ssid = parts[1].clone(); // Дефисы в названиях больше не ломаются!
             let bssid = parts[2].clone();
             let signal = parts[3].parse::<i32>().unwrap_or(0);
-            let frequency = parts[4].split_whitespace().next().unwrap_or("0").parse::<u32>().unwrap_or(0);
+            let frequency = parts[4]
+                .split_whitespace()
+                .next()
+                .unwrap_or("0")
+                .parse::<u32>()
+                .unwrap_or(0);
 
             if !ssid.is_empty() {
                 let mut noise = None;
@@ -109,7 +141,13 @@ pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
                 }
 
                 aps.push(AccessPoint {
-                    ssid, bssid, signal, frequency, noise, snr, is_active,
+                    ssid,
+                    bssid,
+                    signal,
+                    frequency,
+                    noise,
+                    snr,
+                    is_active,
                 });
             }
         }
