@@ -1,20 +1,30 @@
 <script lang="ts">
-  import Scanner from "./lib/features/scanner/Scanner.svelte";
-  import { t } from "./lib/i18n";
+    import Scanner from "./lib/features/scanner/Scanner.svelte";
+    import { t } from "./lib/i18n";
 </script>
 
-<main
-  style="display: flex; flex-direction: column; height: 100vh; padding: var(--space-4);"
->
-  <header
-    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);"
-  >
-    <h1 style="margin: 0;">
-      Nodaris <span style="color: var(--color-primary); font-size: 0.6em;"
-        >{t("app_subtitle")}</span
-      >
-    </h1>
-  </header>
+<header class="topbar">
+    <div class="frame brand">
+        <span class="brand-mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M3 9a14 14 0 0 1 18 0M6 13a9.5 9.5 0 0 1 12 0m-8.5 4a4 4 0 0 1 5 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                <circle cx="12" cy="20" r="1" fill="currentColor"/>
+            </svg>
+        </span>
+        <strong>Nodaris</strong>
+        <span class="subtitle">{t("app_subtitle")}</span>
+    </div>
+</header>
 
-  <Scanner />
+<main class="frame">
+    <Scanner />
 </main>
+
+<style>
+    .frame { width: min(100%, 70rem); margin-inline: auto; padding-inline: clamp(var(--space-3), 4vw, var(--space-5)); }
+    .topbar { border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+    .brand { min-height: 3.75rem; display: flex; align-items: center; gap: var(--space-2); }
+    .brand-mark { display: grid; place-items: center; width: 2rem; height: 2rem; background: var(--color-bg); color: var(--color-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+    .subtitle { color: var(--color-text-muted); font-size: .75rem; }
+    main { padding-block: clamp(var(--space-3), 4vw, var(--space-5)); }
+</style>

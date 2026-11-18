@@ -1,12 +1,16 @@
 :root {
+    color-scheme: dark;
     /* Цвета из логотипа Nodaris */
     --color-bg: #060b19;       /* Глубокий темно-синий */
+    --color-surface-raised: #152137;
     --color-surface: #0f172a;  /* Чуть светлее для карточек */
     --color-primary: #00b4d8;  /* Яркий голубой (свечение) */
     --color-primary-hover: #0077b6;
     --color-text: #e2e8f0;     /* Светло-серый текст */
     --color-text-muted: #94a3b8;
     --color-border: #1e293b;
+    --color-on-primary: var(--color-bg);
+    --color-on-primary-hover: var(--color-text);
     
     /* Семантические цвета */
     --color-success: #10b981;
@@ -31,7 +35,7 @@ body {
     font-family: var(--font-family);
     margin: 0;
     padding: 0;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
@@ -46,7 +50,7 @@ body {
 
 .btn {
     background: var(--color-primary);
-    color: #000;
+    color: var(--color-on-primary);
     border: none;
     padding: var(--space-2) var(--space-4);
     border-radius: var(--radius-md);
@@ -55,9 +59,9 @@ body {
     transition: background 0.2s;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
     background: var(--color-primary-hover);
-    color: #fff;
+    color: var(--color-on-primary-hover);
 }
 
 .table-scroll {
@@ -81,3 +85,8 @@ th {
     font-size: 0.85rem;
     text-transform: uppercase;
 }
+
+button, input, select { font: inherit; }
+*, *::before, *::after { box-sizing: border-box; }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.btn:disabled { opacity: .7; cursor: wait; }
