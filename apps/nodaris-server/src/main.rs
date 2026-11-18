@@ -1,6 +1,6 @@
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde_json::json;
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::services::ServeDir;
 
 async fn scan_handler() -> impl IntoResponse {
     match nodaris_linux::scan_wifi() {
@@ -38,10 +38,9 @@ async fn main() {
     let app = Router::new()
         .route("/api/scan", get(scan_handler))
         // ИСПОЛЬЗУЕМ fallback_service вместо nest_service
-        .fallback_service(ServeDir::new(static_dir))
-        .layer(CorsLayer::permissive());
+        .fallback_service(ServeDir::new(static_dir));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await.unwrap();
     println!("Nodaris server running on http://localhost:8080");
     axum::serve(listener, app).await.unwrap();
 }

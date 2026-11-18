@@ -90,4 +90,8 @@ impl CoreError {
         self.technical_message = Some(msg.into());
         self
     }
+
+    pub fn permission_err(key: &str) -> Self {
+        Self::new(key, ErrorCode::PermissionDenied, ErrorSeverity::Error)
+    }
 }

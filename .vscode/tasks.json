@@ -3,22 +3,7 @@
   "tasks": [
     {
       "label": "dev",
-      "dependsOn": ["tauri"],
-      "dependsOrder": "parallel",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "dev:browser",
-      "dependsOn": ["server", "ui"],
-      "dependsOrder": "parallel",
-      "problemMatcher": []
-    },
-    {
-      "label": "tauri",
+      "detail": "Запустить Nodaris Desktop через Tauri",
       "type": "shell",
       "command": "npx tauri dev",
       "options": { "cwd": "${workspaceFolder}/apps/nodaris-desktop" },
@@ -27,23 +12,25 @@
       "presentation": { "panel": "dedicated", "group": "dev" }
     },
     {
+      "label": "dev:browser",
+      "detail": "Запустить Axum и Vite",
+      "dependsOn": ["server", "ui"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
       "label": "server",
+      "detail": "Запустить только HTTP-сервер Nodaris",
       "type": "shell",
       "command": "cargo run -p nodaris-server",
+      "options": { "cwd": "${workspaceFolder}" },
       "isBackground": true,
-      "problemMatcher": {
-        "owner": "rust",
-        "pattern": { "regexp": "^$" },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "Nodaris server running",
-          "endsPattern": "(panic|error\\[)"
-        }
-      },
+      "problemMatcher": ["$rustc"],
       "presentation": { "panel": "dedicated", "group": "dev" }
     },
     {
       "label": "ui",
+      "hide": true,
       "type": "shell",
       "command": "npm run dev",
       "options": { "cwd": "${workspaceFolder}/ui" },
@@ -53,6 +40,7 @@
     },
     {
       "label": "build",
+      "detail": "Собрать UI и Rust workspace",
       "dependsOn": ["build:ui", "build:rust"],
       "dependsOrder": "parallel",
       "problemMatcher": [],
@@ -60,6 +48,7 @@
     },
     {
       "label": "build:ui",
+      "hide": true,
       "type": "shell",
       "command": "npm run build",
       "options": { "cwd": "${workspaceFolder}/ui" },
@@ -67,18 +56,22 @@
     },
     {
       "label": "build:rust",
+      "hide": true,
       "type": "shell",
       "command": "cargo build --workspace",
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": ["$rustc"]
     },
     {
       "label": "check",
+      "detail": "Проверить Svelte и Rust workspace",
       "dependsOn": ["check:ui", "check:rust"],
       "dependsOrder": "parallel",
       "problemMatcher": []
     },
     {
       "label": "check:ui",
+      "hide": true,
       "type": "shell",
       "command": "npm run check",
       "options": { "cwd": "${workspaceFolder}/ui" },
@@ -86,8 +79,10 @@
     },
     {
       "label": "check:rust",
+      "hide": true,
       "type": "shell",
       "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": ["$rustc"]
     }
   ]

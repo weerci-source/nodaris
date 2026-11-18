@@ -1,9 +1,4 @@
-use nodaris_core::{
-    error::{CoreError, ErrorCode, ErrorSeverity},
-    keys,
-    models::AccessPoint,
-};
-use std::fs;
+use nodaris_core::{error::CoreError, keys, models::access_point::AccessPoint};
 use std::process::Command;
 
 // Надежный парсер, который не ломается на двоеточиях в SSID и BSSID
@@ -14,12 +9,12 @@ fn split_escaped(input: &str, delim: char) -> Vec<String> {
 
     while let Some(c) = chars.next() {
         if c == '\\' {
-            if let Some(&next) = chars.peek() {
-                if next == delim {
-                    current.push(next);
-                    chars.next();
-                    continue;
-                }
+            if let Some(&next) = chars.peek()
+                && next == delim
+            {
+                current.push(next);
+                chars.next();
+                continue;
             }
             current.push(c);
         } else if c == delim {
@@ -46,65 +41,20 @@ pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
         ])
         .output()
         .map_err(|e| {
-            CoreError::new(
-                keys::scan::UNKNOWN_FAILURE,
-                ErrorCode::HardwareError,
-                ErrorSeverity::Error,
-            )
-            .with_tech(format!("Failed to execute nmcli: {}", e))
+            CoreError::hardware_err(keys::scan::UNKNOWN_FAILURE)
+                .with_tech(format!("Failed to execute nmcli: {}", e))
         })?;
 
     if !output.status.success() {
-        let err_msg = String::from_utf8_lossy(&output.stderr);
-        let error_key =
-            if err_msg.contains("Not authorized") || err_msg.contains("Permission denied") {
-                keys::scan::WIFI_PERMISSION_DENIED
-            } else {
-                keys::scan::UNKNOWN_FAILURE
-            };
-        return Err(
-            CoreError::new(error_key, ErrorCode::PermissionDenied, ErrorSeverity::Error)
-                .with_tech(err_msg.to_string()),
-        );
-    }
+        let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // Получаем реальный сигнал и шум для активного интерфейса из /proc/net/wireless
-    let mut real_sig = None;
-    let mut real_noise = None;
+        let error = if stderr.contains("Not authorized") || stderr.contains("Permission denied") {
+            CoreError::permission_err(keys::scan::WIFI_PERMISSION_DENIED)
+        } else {
+            CoreError::hardware_err(keys::scan::UNKNOWN_FAILURE)
+        };
 
-    if let Ok(out) = Command::new("nmcli")
-        .args(["-t", "-f", "DEVICE,TYPE", "device"])
-        .output()
-    {
-        let s = String::from_utf8_lossy(&out.stdout);
-        if let Some(iface) = s
-            .lines()
-            .find(|l| l.contains(":wifi"))
-            .map(|l| l.split(':').next().unwrap_or(""))
-        {
-            if let Ok(content) = fs::read_to_string("/proc/net/wireless") {
-                for line in content.lines().skip(2) {
-                    if line.trim().starts_with(&format!("{}:", iface)) {
-                        let parts: Vec<&str> = line.split_whitespace().collect();
-                        if parts.len() >= 5 {
-                            let sig_str = parts[3].trim_end_matches('.');
-                            let noise_str = parts[4].trim_end_matches('.');
-                            if let (Ok(sig), Ok(noise)) =
-                                (sig_str.parse::<i32>(), noise_str.parse::<i32>())
-                            {
-                                real_sig = Some(sig);
-                                // Отбрасываем мусор (0 или -256)
-                                real_noise = if noise < 0 && noise > -120 {
-                                    Some(noise)
-                                } else {
-                                    None
-                                };
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        return Err(error.with_tech(stderr.into_owned()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -112,47 +62,40 @@ pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
 
     for line in stdout.lines() {
         let parts = split_escaped(line, ':');
-
-        // Теперь у нас 5 частей: IN-USE, SSID, BSSID, SIGNAL, FREQ
-        if parts.len() >= 5 {
-            let in_use = parts[0].trim() == "*" || parts[0].trim() == "yes";
-            let ssid = parts[1].clone(); // Дефисы в названиях больше не ломаются!
-            let bssid = parts[2].clone();
-            let signal = parts[3].parse::<i32>().unwrap_or(0);
-            let frequency = parts[4]
-                .split_whitespace()
-                .next()
-                .unwrap_or("0")
-                .parse::<u32>()
-                .unwrap_or(0);
-
-            if !ssid.is_empty() {
-                let mut noise = None;
-                let mut snr = None;
-                let mut is_active = false;
-
-                if in_use {
-                    is_active = true;
-                    noise = real_noise;
-                    // SNR считаем только если драйвер отдал адекватный шум
-                    if let (Some(s), Some(n)) = (real_sig, real_noise) {
-                        snr = Some(s - n);
-                    }
-                }
-
-                aps.push(AccessPoint {
-                    ssid,
-                    bssid,
-                    signal,
-                    frequency,
-                    noise,
-                    snr,
-                    is_active,
-                });
-            }
+        if parts.len() < 5 || parts[1].is_empty() {
+            continue;
         }
+
+        let signal_quality_percent = parts[3]
+            .trim()
+            .parse::<u8>()
+            .ok()
+            .filter(|&value| value <= 100);
+
+        let Some(frequency_mhz) = parts[4]
+            .split_whitespace()
+            .next()
+            .and_then(|value| value.parse::<u32>().ok())
+            .filter(|&value| value > 0)
+        else {
+            // В текущей модели частота обязательна.
+            // Не подставляем 0 МГц вместо невалидного значения.
+            continue;
+        };
+
+        aps.push(AccessPoint {
+            ssid: parts[1].clone(),
+            bssid: parts[2].clone(),
+            rssi_dbm: None,
+            signal_quality_percent,
+            frequency_mhz,
+            channel: None,
+            channel_width_mhz: None,
+            is_connected: matches!(parts[0].trim(), "*" | "yes"),
+        });
     }
 
-    aps.sort_by_key(|a| std::cmp::Reverse(a.signal));
+    aps.sort_by_key(|ap| std::cmp::Reverse(ap.signal_quality_percent));
+
     Ok(aps)
 }
