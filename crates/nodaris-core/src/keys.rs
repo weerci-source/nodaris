@@ -2,6 +2,9 @@ pub mod transport {
     pub const SESSION_IPC_FAILURE: &str = "session_ipc_failure";
     pub const SESSION_HTTP_FAILURE: &str = "session_http_failure";
     pub const SESSION_INVALID_RESPONSE: &str = "session_invalid_response";
+    pub const ETHERNET_IPC_FAILURE: &str = "ethernet_ipc_failure";
+    pub const ETHERNET_HTTP_FAILURE: &str = "ethernet_http_failure";
+    pub const ETHERNET_INVALID_RESPONSE: &str = "ethernet_invalid_response";
 }
 pub mod common {
     pub const INTERNAL_ERROR: &str = "internal_error";
@@ -28,4 +31,10 @@ pub mod diagnostics {
     pub const SESSION_INVALID_REQUEST: &str = "diagnostics_session_invalid_request";
     pub const SESSION_UNSUPPORTED: &str = "diagnostics_session_unsupported";
     pub const PROBE_BUSY: &str = "diagnostics_probe_busy";
+    pub const ETHERNET_FORBIDDEN: &str = "diagnostics_ethernet_forbidden";
+    pub const ETHERNET_INVALID_REQUEST: &str = "diagnostics_ethernet_invalid_request";
+    pub const ETHERNET_INVALID_TARGET: &str = "diagnostics_ethernet_invalid_target";
+    pub const ETHERNET_INTERFACE_UNAVAILABLE: &str = "diagnostics_ethernet_interface_unavailable";
+    pub const ETHERNET_READ_FAILED: &str = "diagnostics_ethernet_read_failed";
+    pub const ETHERNET_UNSUPPORTED: &str = "diagnostics_ethernet_unsupported";
 }

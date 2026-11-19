@@ -3,6 +3,7 @@ pub mod airtime;
 pub mod connection;
 pub mod connection_timeline;
 pub mod diagnostic_report;
+pub mod ethernet;
 pub mod icmp;
 pub mod measurement;
 pub mod radio;

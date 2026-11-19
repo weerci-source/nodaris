@@ -1,4 +1,5 @@
 mod connection_api;
+mod ethernet_api;
 mod probe_api;
 mod radio_api;
 mod session_api;
@@ -58,6 +59,16 @@ async fn main() {
         .route(
             "/api/diagnostics/session",
             post(session_api::session_handler)
+                .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(1024))
+                .layer(Extension(listen_addr.port())),
+        )
+        .route(
+            "/api/diagnostics/ethernet/interfaces",
+            get(ethernet_api::interfaces_handler).layer(Extension(listen_addr.port())),
+        )
+        .route(
+            "/api/diagnostics/ethernet",
+            post(ethernet_api::ethernet_handler)
                 .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(1024))
                 .layer(Extension(listen_addr.port())),
         )

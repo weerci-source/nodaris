@@ -1,6 +1,6 @@
 import { toApiError, type ApiError } from "../../i18n";
 
-type Route = { interface: string; gateway: string | null };
+type Route = { interface: string; gateway: string | null; source?: string | null; table?: string | null };
 type Statistics = {
     sent: number;
     received: number;
@@ -72,7 +72,9 @@ function isSeries(value: unknown): value is Series {
         (value.attempts === undefined || (Array.isArray(value.attempts) && value.attempts.every(isAttempt))) &&
         (value.statistics === null || isStatistics(value.statistics)) &&
         (value.route === null || (
-            record(value.route) && typeof value.route.interface === "string" && optionalText(value.route.gateway)
+            record(value.route) && typeof value.route.interface === "string" && optionalText(value.route.gateway) &&
+            (value.route.source === undefined || optionalText(value.route.source)) &&
+            (value.route.table === undefined || optionalText(value.route.table))
         ));
 }
 

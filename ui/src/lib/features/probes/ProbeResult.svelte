@@ -34,6 +34,12 @@
                     {#if series.route.gateway}
                         <div><dt>{t("probe_route_gateway")}</dt><dd>{series.route.gateway}</dd></div>
                     {/if}
+                    {#if series.route.source}
+                        <div><dt>{t("probe_route_source")}</dt><dd>{series.route.source}</dd></div>
+                    {/if}
+                    {#if series.route.table}
+                        <div><dt>{t("probe_route_table")}</dt><dd>{series.route.table}</dd></div>
+                    {/if}
                 {/if}
                 <div>
                     <dt>{t("probe_duration")}</dt>

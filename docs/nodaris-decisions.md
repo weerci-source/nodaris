@@ -141,6 +141,22 @@
 
 **Источники для переноса.** Для Windows проверке подлежат Native Wi-Fi для состояния и RSSI, разрешение геолокации для BSSID, IP Helper для маршрута и IPv4 ICMP API. Для Android проверке подлежат `WifiInfo`, возраст `ScanResult` с учётом ограничений сканирования и `LinkProperties` для интерфейса и маршрутов. Метод сетевой пробы на Android предстоит подтвердить на устройстве. [Native Wi-Fi](https://learn.microsoft.com/en-us/windows/win32/api/wlanapi/nf-wlanapi-wlanqueryinterface), [доступ к геолокации в Windows](https://learn.microsoft.com/windows/win32/nativewifi/wi-fi-access-location-changes), [IP Helper](https://learn.microsoft.com/en-us/windows/win32/api/netioapi/nf-netioapi-getbestroute2), [Windows ICMP API](https://learn.microsoft.com/en-us/windows/win32/api/icmpapi/nf-icmpapi-icmpsendecho2), [Android Wi-Fi](https://developer.android.com/develop/connectivity/wifi/wifi-scan), [Android LinkProperties](https://developer.android.com/reference/android/net/LinkProperties).
 
+## ADR-015 — Локальный Ethernet и маршруты сетевых проб
+
+**Дата фиксации** — 2026-11-20.
+
+**Статус** — реализовано для Linux в Web и Tauri.
+
+**Контекст.** На проверяемом компьютере есть Ethernet и VPN. NetworkManager возвращает пустые списки Wi-Fi-адаптеров и точек доступа. Маршрут до шлюза и маршрут до публичного адреса могут начинаться на разных интерфейсах.
+
+**Решение.** «Ethernet» доступен как отдельный раздел. Linux отбирает интерфейсы аппаратного типа Ethernet со ссылкой на устройство в `/sys/class/net` и исключает интерфейсы с признаками Wi-Fi и WWAN. `flags` и `carrier` различают выключенный интерфейс, отсутствие сигнала и активный линк. Поле `speed` используется на активном линке, состояние проверяется повторно после чтения. Показания содержат источник, время и причину недоступности. [ABI сетевых атрибутов Linux](https://github.com/torvalds/linux/blob/master/Documentation/ABI/testing/sysfs-class-net)
+
+**Контракт.** HTTP `GET /api/diagnostics/ethernet/interfaces` и Tauri `ethernet_interfaces` возвращают список снимков. HTTP `POST /api/diagnostics/ethernet` и Tauri `ethernet_diagnostics` принимают `interface` и публичный IPv4 `target`, возвращают снимок линка перед пробами и общий отчёт ICMP по ADR-009. Интерфейс и цель проверяются в Linux-операции. Для внешней серии UI показывает выбранный ОС интерфейс, следующий шлюз, исходный адрес и таблицу, когда они доступны. Ошибки операции используют `ApiError`; частичная недоступность показаний сохраняется в отчёте.
+
+**Последствия.** Скорость относится к локальному линку в момент снимка. Сетевые пробы характеризуют путь по наблюдаемому маршруту. Для отбора интерфейсов используются признаки, предоставляемые Linux и драйвером. Краткая смена состояния между снимками может остаться незамеченной.
+
+**Проверка.** Модульные тесты покрывают отбор интерфейсов, выключенный линк, отсутствие сигнала и неизвестную скорость. На реальном `eth0` получено 100 Мбит/с. Маршруты до шлюза через `eth0` и до внешней цели через `wg0` сверены с `ip route get`.
+
 ## Кандидаты на следующие решения
 
 | Тема | Статус | Что нужно решить |

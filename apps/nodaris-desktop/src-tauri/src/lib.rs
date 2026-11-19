@@ -6,7 +6,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::scan_wifi,
             commands::wifi_interfaces,
-            commands::diagnostic_session
+            commands::diagnostic_session,
+            commands::ethernet_interfaces,
+            commands::ethernet_diagnostics
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -1,0 +1,167 @@
+<script lang="ts">
+    import { onMount } from "svelte";
+    import Alert from "../../components/ui/Alert.svelte";
+    import Button from "../../components/ui/Button.svelte";
+    import LoadingStatus from "../../components/ui/LoadingStatus.svelte";
+    import Skeleton from "../../components/ui/Skeleton.svelte";
+    import { currentLang, t, translateError, type ApiError } from "../../i18n";
+    import ProbeResult from "../probes/ProbeResult.svelte";
+    import { listEthernetLinks, runEthernet, type EthernetLink, type EthernetReport } from "./ethernet-api";
+
+    const id = $props.id();
+    const rate = new Intl.NumberFormat(currentLang);
+    const time = new Intl.DateTimeFormat(currentLang, { dateStyle: "short", timeStyle: "medium" });
+    let links = $state.raw<EthernetLink[] | null>(null);
+    let interfaceName = $state("");
+    let link = $derived(links?.find((item) => item.interface === interfaceName));
+    let target = $state("");
+    let listing = $state(true);
+    let running = $state(false);
+    let listError = $state<ApiError | null>(null);
+    let runError = $state<ApiError | null>(null);
+    let targetError = $state<ApiError | null>(null);
+    let lastReport = $state.raw<EthernetReport | null>(null);
+    let report = $derived(lastReport?.link.interface === interfaceName ? lastReport : null);
+    let request: AbortController | null = null;
+
+    async function refresh() {
+        if (request) return;
+        const controller = new AbortController();
+        request = controller;
+        listing = true;
+        listError = null;
+        const result = await listEthernetLinks(controller.signal);
+        if (controller.signal.aborted) return;
+        request = null;
+        listing = false;
+        if (!result.ok) {
+            listError = result.error;
+            return;
+        }
+        links = result.value;
+        if (!links.some((item) => item.interface === interfaceName)) {
+            interfaceName = links.find((item) => item.state.state.status === "available" &&
+                item.state.state.value === "up")?.interface ?? links[0]?.interface ?? "";
+            lastReport = null;
+            runError = null;
+        }
+    }
+
+    async function run(event: SubmitEvent) {
+        event.preventDefault();
+        if (request || !link) return;
+        const controller = new AbortController();
+        request = controller;
+        running = true;
+        runError = null;
+        targetError = null;
+        const result = await runEthernet(interfaceName, target.trim(), controller.signal);
+        if (controller.signal.aborted) return;
+        request = null;
+        running = false;
+        if (result.ok) {
+            lastReport = result.value;
+            links = links?.map((item) => item.interface === result.value.link.interface
+                ? result.value.link : item) ?? null;
+        } else if (result.error.key === "diagnostics_ethernet_invalid_target") {
+            targetError = result.error;
+        } else {
+            runError = result.error;
+        }
+    }
+
+    function unavailable(reason: string) {
+        const key = `ethernet_reason_${reason}`;
+        const message = t(key);
+        return message === key ? t("scan_metric_missing") : message;
+    }
+
+    onMount(() => {
+        void refresh();
+        return () => request?.abort();
+    });
+</script>
+
+{#snippet showError(error: ApiError)}
+    <Alert severity={error.severity}>
+        {translateError(error)}
+        {#if error.request_id}
+            <p class="ui-muted">{t("session_request_id", [error.request_id])}</p>
+        {/if}
+    </Alert>
+{/snippet}
+
+<section id="ethernet" class="card ui-stack ui-section" aria-labelledby={`${id}-title`}>
+    <header class="ui-row ui-row-between">
+        <h2 class="ui-title" id={`${id}-title`}>{t("ethernet_title")}</h2>
+        <Button variant="secondary" loading={listing} disabled={running} onclick={refresh}>
+            {t("radio_ui_refresh_interfaces")}
+        </Button>
+    </header>
+
+    {#if listing && links === null}<Skeleton />{/if}
+    <LoadingStatus message={listing
+        ? t(links === null ? "ethernet_loading" : "ethernet_refreshing")
+        : running ? t(report ? "probe_refreshing" : "probe_collecting") : ""} />
+    {#if listError}
+        {@render showError(listError)}
+    {:else if links?.length === 0}
+        <p class="ui-muted" role="status">{t("ethernet_empty")}</p>
+    {/if}
+
+    {#if link && links}
+        <form class="ui-stack" onsubmit={run} novalidate>
+            <div class="ui-row">
+                <label class="ui-field">
+                    <span>{t("ethernet_interface")}</span>
+                    <select class="ui-control" bind:value={interfaceName} disabled={listing || running}
+                        onchange={() => { runError = null; }}>
+                        {#each links as item (item.interface)}
+                            <option value={item.interface}>{item.interface}</option>
+                        {/each}
+                    </select>
+                </label>
+                <div class="ui-stack">
+                    <label class="ui-field">
+                        <span>{t("probe_target")}</span>
+                        <input class="ui-control" type="text" inputmode="decimal" maxlength="15" required
+                            bind:value={target} disabled={running} aria-invalid={Boolean(targetError)}
+                            aria-describedby={targetError ? `${id}-target-error` : undefined}
+                            oninput={() => { targetError = null; }} />
+                    </label>
+                    {#if targetError}
+                        <div id={`${id}-target-error`}>{@render showError(targetError)}</div>
+                    {/if}
+                </div>
+                <Button type="submit" loading={running} disabled={listing}>{t("probe_start")}</Button>
+            </div>
+            <dl class="ui-metrics">
+                <div>
+                    <dt>{t("ethernet_local_link")}</dt>
+                    <dd>{link.state.state.status === "available"
+                        ? t(`ethernet_link_${link.state.state.value}`) : unavailable(link.state.state.value)}</dd>
+                </div>
+                <div>
+                    <dt>{t("ethernet_speed")}</dt>
+                    <dd>{link.speed_mbps.state.status === "available"
+                        ? t("ethernet_speed_value", [rate.format(link.speed_mbps.state.value)])
+                        : unavailable(link.speed_mbps.state.value)}</dd>
+                </div>
+                {#if link.state.observed_at.unix_time_ms !== null}
+                    <div>
+                        <dt>{t("ethernet_link_observed_at")}</dt>
+                        <dd>{time.format(link.state.observed_at.unix_time_ms)}</dd>
+                    </div>
+                {/if}
+            </dl>
+        </form>
+    {/if}
+
+    {#if runError}{@render showError(runError)}{/if}
+    {#if report}
+        <section class="ui-stack ui-subsection" aria-labelledby={`${id}-probes`}>
+            <h3 class="ui-title" id={`${id}-probes`}>{t("probe_title")}</h3>
+            <ProbeResult report={report.probes} />
+        </section>
+    {/if}
+</section>
