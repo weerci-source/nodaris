@@ -46,7 +46,7 @@ pub(super) async fn ethernet_handler(
             diagnostics::ETHERNET_INVALID_REQUEST,
         )));
     };
-    reply(nodaris_linux::collect_ethernet_report(request.interface, request.target).await)
+    reply(nodaris_linux::history::run_ethernet(request.interface, request.target).await)
 }
 
 fn forbidden() -> Response {

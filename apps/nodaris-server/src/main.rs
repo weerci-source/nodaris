@@ -1,5 +1,6 @@
 mod connection_api;
 mod ethernet_api;
+mod history_api;
 mod probe_api;
 mod radio_api;
 mod session_api;
@@ -43,6 +44,7 @@ async fn main() {
     let listen_addr = listener.local_addr().unwrap();
 
     let app = Router::new()
+        .merge(history_api::routes(listen_addr.port()))
         .route("/api/scan", get(scan_handler))
         .route(
             "/api/diagnostics/probes",

@@ -59,6 +59,10 @@ impl CoreError {
         Self::new(key, ErrorCode::HardwareError, ErrorSeverity::Error)
     }
 
+    pub fn io_err(key: &str) -> Self {
+        Self::new(key, ErrorCode::IOError, ErrorSeverity::Error)
+    }
+
     pub fn internal(msg: impl Into<String>) -> Self {
         Self::new(
             keys::common::INTERNAL_ERROR,

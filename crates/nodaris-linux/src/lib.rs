@@ -1,5 +1,6 @@
 mod connection;
 mod ethernet;
+pub mod history;
 mod icmp;
 mod radio;
 mod session;

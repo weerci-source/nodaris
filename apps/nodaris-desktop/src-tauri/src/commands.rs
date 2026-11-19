@@ -3,6 +3,7 @@ use nodaris_core::{
     models::{
         access_point::AccessPoint,
         ethernet::{EthernetLink, EthernetReport},
+        history::{HistoryEntry, RecordedReport},
         session::DiagnosticSession,
     },
 };
@@ -49,10 +50,10 @@ pub(super) struct WifiInterface {
 pub(super) async fn diagnostic_session(
     interface: String,
     target: Option<String>,
-) -> Result<DiagnosticSession, ApiError> {
+) -> Result<RecordedReport<DiagnosticSession>, ApiError> {
     #[cfg(target_os = "linux")]
     {
-        nodaris_linux::collect_session(interface, target)
+        nodaris_linux::history::run_session(interface, target)
             .await
             .map_err(CoreError::into_api)
     }
@@ -77,10 +78,10 @@ pub(super) async fn ethernet_interfaces() -> Result<Vec<EthernetLink>, ApiError>
 pub(super) async fn ethernet_diagnostics(
     interface: String,
     target: String,
-) -> Result<EthernetReport, ApiError> {
+) -> Result<RecordedReport<EthernetReport>, ApiError> {
     #[cfg(target_os = "linux")]
     {
-        nodaris_linux::collect_ethernet_report(interface, target)
+        nodaris_linux::history::run_ethernet(interface, target)
             .await
             .map_err(CoreError::into_api)
     }
@@ -89,6 +90,40 @@ pub(super) async fn ethernet_diagnostics(
         let _ = (interface, target);
         Err(ethernet_unsupported())
     }
+}
+
+#[tauri::command]
+pub(super) async fn diagnostic_history() -> Result<Vec<HistoryEntry<serde_json::Value>>, ApiError> {
+    #[cfg(target_os = "linux")]
+    {
+        nodaris_linux::history::list()
+            .await
+            .map_err(CoreError::into_api)
+    }
+    #[cfg(not(target_os = "linux"))]
+    Err(history_unsupported())
+}
+
+#[tauri::command]
+pub(super) async fn delete_diagnostic_history(
+    id: String,
+) -> Result<Vec<HistoryEntry<serde_json::Value>>, ApiError> {
+    #[cfg(target_os = "linux")]
+    {
+        nodaris_linux::history::delete(id)
+            .await
+            .map_err(CoreError::into_api)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = id;
+        Err(history_unsupported())
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn history_unsupported() -> ApiError {
+    CoreError::hardware_err(nodaris_core::keys::history::UNSUPPORTED).into_api()
 }
 
 #[cfg(not(target_os = "linux"))]

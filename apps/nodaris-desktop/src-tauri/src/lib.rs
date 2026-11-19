@@ -8,7 +8,9 @@ pub fn run() {
             commands::wifi_interfaces,
             commands::diagnostic_session,
             commands::ethernet_interfaces,
-            commands::ethernet_diagnostics
+            commands::ethernet_diagnostics,
+            commands::diagnostic_history,
+            commands::delete_diagnostic_history
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

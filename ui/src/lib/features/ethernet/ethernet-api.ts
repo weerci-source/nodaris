@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { toApiError, type ApiError } from "../../i18n";
+import { historySaveError } from "../history/history-save";
 import { isProbeReport, type ProbeReport } from "../probes/probe-api";
 
 type LinkState = "up" | "down" | "disabled";
@@ -14,7 +15,7 @@ export type EthernetLink = {
     speed_mbps: Measurement<number>;
 };
 export type EthernetReport = { link: EthernetLink; probes: ProbeReport };
-type Result<T> = { ok: true; value: T } | { ok: false; error: ApiError };
+type Result<T> = { ok: true; value: T; historyError: ApiError | null } | { ok: false; error: ApiError };
 type Request = { interface: string; target: string };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -85,12 +86,17 @@ async function read<T>(
         }
         if (!response.ok) return { ok: false, error: toApiError(body, invalid) };
     }
-    return decode(body) ? { ok: true, value: body } : { ok: false, error: invalid };
+    return decode(body) ? { ok: true, value: body, historyError: historySaveError(body) } : { ok: false, error: invalid };
 }
 
 export function listEthernetLinks(signal: AbortSignal): Promise<Result<EthernetLink[]>> {
     return read(signal, (value): value is EthernetLink[] =>
         Array.isArray(value) && value.every(isLink));
+}
+
+export function isEthernetReport(value: unknown): value is EthernetReport {
+    return record(value) && isLink(value.link) && isProbeReport(value.probes) &&
+        value.probes.interface === value.link.interface;
 }
 
 export function runEthernet(
@@ -99,8 +105,7 @@ export function runEthernet(
     signal: AbortSignal,
 ): Promise<Result<EthernetReport>> {
     return read(signal, (value): value is EthernetReport =>
-        record(value) && isLink(value.link) && value.link.interface === interfaceName &&
-        isProbeReport(value.probes) && value.probes.interface === interfaceName &&
+        isEthernetReport(value) && value.link.interface === interfaceName &&
         value.probes.external.target === target,
     { interface: interfaceName, target });
 }

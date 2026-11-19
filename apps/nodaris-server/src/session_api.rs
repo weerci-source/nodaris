@@ -36,7 +36,7 @@ pub(super) async fn session_handler(
             CoreError::validation(diagnostics::SESSION_INVALID_REQUEST),
         );
     };
-    match nodaris_linux::collect_session(request.interface, request.target).await {
+    match nodaris_linux::history::run_session(request.interface, request.target).await {
         Ok(report) => ([(header::CACHE_CONTROL, "no-store")], Json(report)).into_response(),
         Err(error) => {
             let status = match error.code {

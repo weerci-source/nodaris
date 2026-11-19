@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { toApiError, type ApiError } from "../../i18n";
 import { isConnectionReport, type ConnectionReport } from "../connection/connection-api";
+import { historySaveError } from "../history/history-save";
 import { isProbeReport, type ProbeReport } from "../probes/probe-api";
 import { decodeRadio, type Radio } from "../radio/radio-api";
 
@@ -26,7 +27,7 @@ export type DiagnosticSession = {
     hypotheses: Hypothesis[];
 };
 
-type Result = { ok: true; report: DiagnosticSession } | { ok: false; error: ApiError };
+type Result = { ok: true; report: DiagnosticSession; historyError: ApiError | null } | { ok: false; error: ApiError };
 
 function record(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -66,11 +67,12 @@ function section<T>(value: unknown, decode: (value: unknown) => T | null): Secti
     return data === null ? null : { status: "available", data };
 }
 
-function decode(value: unknown, name: string, target: string | null): DiagnosticSession | null {
-    if (!record(value) || typeof value.id !== "string" || value.interface !== name ||
+export function decodeSession(value: unknown, target: string | null): DiagnosticSession | null {
+    if (!record(value) || typeof value.id !== "string" || typeof value.interface !== "string" ||
         (value.platform !== "linux" && value.platform !== "windows" && value.platform !== "android") ||
         !timestamp(value.started_at) || !timestamp(value.finished_at) || typeof value.rules_version !== "number" ||
         !Array.isArray(value.hypotheses) || !value.hypotheses.every(isHypothesis)) return null;
+    const name = value.interface;
     const radio = section(value.radio, (data) => decodeRadio(data, name));
     const probes = section(value.probes, (data) =>
         isProbeReport(data) && data.interface === name && data.external.target === target ? data : null);
@@ -116,6 +118,8 @@ export async function runSession(interfaceName: string, target: string | null, s
         if (!response.ok) return { ok: false, error: toApiError(body, error("session_invalid_response", "ParseError")) };
     }
 
-    const report = decode(body, interfaceName, target);
-    return report ? { ok: true, report } : { ok: false, error: error("session_invalid_response", "ParseError") };
+    const report = decodeSession(body, target);
+    return report?.interface === interfaceName
+        ? { ok: true, report, historyError: historySaveError(body) }
+        : { ok: false, error: error("session_invalid_response", "ParseError") };
 }

@@ -2,10 +2,26 @@
     import Scanner from "./lib/features/scanner/Scanner.svelte";
     import { isTauri } from "@tauri-apps/api/core";
     import EthernetPanel from "./lib/features/ethernet/EthernetPanel.svelte";
+    import HistoryPanel from "./lib/features/history/HistoryPanel.svelte";
+    import type { HistoryEntry } from "./lib/features/history/history-api";
     import RadioDiagnostics from "./lib/features/radio/RadioDiagnostics.svelte";
     import SessionPanel from "./lib/features/session/SessionPanel.svelte";
     import Icon from "./lib/components/ui/Icon.svelte";
     import { t } from "./lib/i18n";
+
+    let session: SessionPanel;
+    let ethernet: EthernetPanel;
+    let history: HistoryPanel;
+
+    function refreshHistory() {
+        void history?.refresh();
+    }
+
+    async function repeat(entry: HistoryEntry) {
+        return entry.kind === "session"
+            ? await session.prepareRepeat(entry.report.interface, entry.target)
+            : await ethernet.prepareRepeat(entry.report.link.interface, entry.target);
+    }
 </script>
 
 <header class="topbar">
@@ -18,14 +34,16 @@
         <nav class="section-links" aria-label={t("app_sections")}>
             <a href="#diagnostic-session">{t("session_title")}</a>
             <a href="#ethernet">{t("ethernet_title")}</a>
+            <a href="#diagnostic-history">{t("history_title")}</a>
         </nav>
     </div>
 </header>
 
 <main class="frame">
     <Scanner />
-    <SessionPanel />
-    <EthernetPanel />
+    <SessionPanel bind:this={session} onSaved={refreshHistory} />
+    <EthernetPanel bind:this={ethernet} onSaved={refreshHistory} />
+    <HistoryPanel bind:this={history} onRepeat={repeat} />
     {#if !isTauri()}
         <RadioDiagnostics />
     {/if}

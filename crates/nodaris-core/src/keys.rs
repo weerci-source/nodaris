@@ -1,10 +1,23 @@
 pub mod transport {
+    pub const HISTORY_HTTP_FAILURE: &str = "history_http_failure";
+    pub const HISTORY_IPC_FAILURE: &str = "history_ipc_failure";
+    pub const HISTORY_INVALID_RESPONSE: &str = "history_invalid_response";
     pub const SESSION_IPC_FAILURE: &str = "session_ipc_failure";
     pub const SESSION_HTTP_FAILURE: &str = "session_http_failure";
     pub const SESSION_INVALID_RESPONSE: &str = "session_invalid_response";
     pub const ETHERNET_IPC_FAILURE: &str = "ethernet_ipc_failure";
     pub const ETHERNET_HTTP_FAILURE: &str = "ethernet_http_failure";
     pub const ETHERNET_INVALID_RESPONSE: &str = "ethernet_invalid_response";
+}
+
+pub mod history {
+    pub const READ_FAILED: &str = "history_read_failed";
+    pub const SAVE_FAILED: &str = "history_save_failed";
+    pub const DELETE_FAILED: &str = "history_delete_failed";
+    pub const INVALID_ID: &str = "history_invalid_id";
+    pub const FORBIDDEN: &str = "history_forbidden";
+    pub const UNSUPPORTED: &str = "history_unsupported";
+    pub const REPEAT_UNAVAILABLE: &str = "history_repeat_unavailable";
 }
 pub mod common {
     pub const INTERNAL_ERROR: &str = "internal_error";
