@@ -10,6 +10,10 @@ pub mod transport {
     pub const ETHERNET_INVALID_RESPONSE: &str = "ethernet_invalid_response";
 }
 
+pub mod settings {
+    pub const SAVE_FAILED: &str = "settings_save_failed";
+}
+
 pub mod history {
     pub const READ_FAILED: &str = "history_read_failed";
     pub const SAVE_FAILED: &str = "history_save_failed";

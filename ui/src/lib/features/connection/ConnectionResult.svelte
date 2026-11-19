@@ -3,8 +3,8 @@
     import type { ConnectionEndpoint, ConnectionReport } from "./connection-api";
 
     let { report }: { report: ConnectionReport } = $props();
-    const formatTime = new Intl.DateTimeFormat(currentLang, { hour: "numeric", minute: "numeric", second: "numeric" });
-    const formatSeconds = new Intl.NumberFormat(currentLang, { maximumFractionDigits: 1 });
+    let formatTime = $derived(new Intl.DateTimeFormat(currentLang(), { hour: "numeric", minute: "numeric", second: "numeric" }));
+    let formatSeconds = $derived(new Intl.NumberFormat(currentLang(), { maximumFractionDigits: 1 }));
 
     function stickyText(assessment: ConnectionReport["sticky_client"]["assessment"]) {
         if (assessment === "NoEvidence") return t("connection_sticky_no_evidence");

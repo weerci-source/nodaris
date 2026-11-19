@@ -7,8 +7,8 @@
 
     let { report }: { report: DiagnosticSession } = $props();
     const id = $props.id();
-    const time = new Intl.DateTimeFormat(currentLang, { dateStyle: "short", timeStyle: "medium" });
-    const number = new Intl.NumberFormat(currentLang, { maximumFractionDigits: 2 });
+    let time = $derived(new Intl.DateTimeFormat(currentLang(), { dateStyle: "short", timeStyle: "medium" }));
+    let number = $derived(new Intl.NumberFormat(currentLang(), { maximumFractionDigits: 2 }));
 
     function formatTime(value: number | null) {
         return value === null ? t("scan_metric_missing") : time.format(value);

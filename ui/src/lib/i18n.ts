@@ -1,8 +1,11 @@
 import ru from "../locales/ru.json";
 import en from "../locales/en.json";
+import { appearance } from "./appearance.svelte";
 
 const dictionaries: Record<string, Record<string, string>> = { ru, en };
-export const currentLang = "ru";
+export function currentLang() {
+    return appearance.language;
+}
 
 export type ApiError = {
     key: string;
@@ -43,7 +46,7 @@ export function toApiError(
 }
 
 export function t(key: string, args: string[] = []): string {
-    const dict = dictionaries[currentLang];
+    const dict = dictionaries[currentLang()];
     const fallback = dictionaries.en;
     const template = Object.hasOwn(dict, key)
         ? dict[key]

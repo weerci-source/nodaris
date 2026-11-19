@@ -3,8 +3,8 @@
     import type { EthernetLink } from "./ethernet-api";
 
     let { link }: { link: EthernetLink } = $props();
-    const rate = new Intl.NumberFormat(currentLang);
-    const time = new Intl.DateTimeFormat(currentLang, { dateStyle: "short", timeStyle: "medium" });
+    let rate = $derived(new Intl.NumberFormat(currentLang()));
+    let time = $derived(new Intl.DateTimeFormat(currentLang(), { dateStyle: "short", timeStyle: "medium" }));
 
     function unavailable(reason: string) {
         const key = `ethernet_reason_${reason}`;

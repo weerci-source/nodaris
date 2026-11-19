@@ -14,7 +14,7 @@
     let sort = $state<ScanSort>("quality");
     let expanded = $state.raw<AccessPoint | null>(null);
     let searchInput: HTMLInputElement | undefined = $state();
-    let visible = $derived(selectPoints(points, query, band, sort, currentLang));
+    let visible = $derived(selectPoints(points, query, band, sort, currentLang()));
     let filtered = $derived(query.trim() !== "" || band !== "all");
 
     function clearFilters() {

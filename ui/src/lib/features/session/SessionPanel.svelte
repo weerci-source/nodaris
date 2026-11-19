@@ -76,12 +76,13 @@
         loading = false;
     }
 
-    export async function prepareRepeat(name: string, address: string | null): Promise<boolean> {
+    export async function prepareRepeat(name: string, address: string | null, reveal: () => void): Promise<boolean> {
         if (loading || listing || !interfaces.some((item) => item.name === name)) return false;
         interfaceName = name;
         target = address ?? "";
         targetError = null;
         error = null;
+        reveal();
         await tick();
         targetInput?.focus();
         return true;

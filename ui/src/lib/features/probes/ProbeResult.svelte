@@ -7,8 +7,8 @@
     let { report }: { report: ProbeReport } = $props();
     const id = $props.id();
     let expanded = $state<number | null>(null);
-    const numberFormat = new Intl.NumberFormat(currentLang, { maximumFractionDigits: 3 });
-    const timeFormat = new Intl.DateTimeFormat(currentLang, { dateStyle: "short", timeStyle: "medium" });
+    let numberFormat = $derived(new Intl.NumberFormat(currentLang(), { maximumFractionDigits: 3 }));
+    let timeFormat = $derived(new Intl.DateTimeFormat(currentLang(), { dateStyle: "short", timeStyle: "medium" }));
 
     function milliseconds(value: number | null) {
         return value === null ? t("scan_metric_missing") : t("probe_ms_value", [numberFormat.format(value)]);

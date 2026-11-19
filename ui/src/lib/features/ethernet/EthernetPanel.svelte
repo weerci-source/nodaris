@@ -76,12 +76,13 @@
         }
     }
 
-    export async function prepareRepeat(name: string, address: string): Promise<boolean> {
+    export async function prepareRepeat(name: string, address: string, reveal: () => void): Promise<boolean> {
         if (request || !links?.some((item) => item.interface === name)) return false;
         interfaceName = name;
         target = address;
         targetError = null;
         runError = null;
+        reveal();
         await tick();
         targetInput?.focus();
         return true;

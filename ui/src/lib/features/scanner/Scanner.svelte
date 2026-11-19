@@ -18,7 +18,7 @@
     let updatedAt = $state<Date | null>(null);
     const expanded = new SvelteSet<AccessPoint>();
     let connected = $derived(points.filter((point) => point.isConnected));
-    const dateFormat = new Intl.DateTimeFormat(currentLang, { dateStyle: "short", timeStyle: "medium" });
+    let dateFormat = $derived(new Intl.DateTimeFormat(currentLang(), { dateStyle: "short", timeStyle: "medium" }));
     let active: AbortController | null = null;
 
     async function scan() {

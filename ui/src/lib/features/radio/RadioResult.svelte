@@ -6,7 +6,7 @@
 
     let { radio }: { radio: Radio } = $props();
     const id = $props.id();
-    const formatMetric = new Intl.NumberFormat(currentLang, { maximumFractionDigits: 2 });
+    let formatMetric = $derived(new Intl.NumberFormat(currentLang(), { maximumFractionDigits: 2 }));
 
     function reasonText(reason: string) {
         switch (reason) {

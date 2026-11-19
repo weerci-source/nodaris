@@ -12,7 +12,7 @@
 
     let { onRepeat }: { onRepeat: (entry: HistoryEntry) => Promise<boolean> } = $props();
     const id = $props.id();
-    const time = new Intl.DateTimeFormat(currentLang, { dateStyle: "short", timeStyle: "medium" });
+    let time = $derived(new Intl.DateTimeFormat(currentLang(), { dateStyle: "short", timeStyle: "medium" }));
     let entries = $state.raw<HistoryEntry[] | null>(null);
     let selectedId = $state("");
     let selected = $derived(entries?.find((entry) => entry.id === selectedId));
@@ -21,7 +21,7 @@
     let deleting = $state(false);
     let loadError = $state<ApiError | null>(null);
     let actionError = $state<ApiError | null>(null);
-    let status = $state("");
+    let deleted = $state(false);
     let heading: HTMLHeadingElement;
     let selection = $state<HTMLSelectElement>();
     let active: AbortController | null = null;
@@ -56,7 +56,7 @@
     async function remove() {
         if (deleting || !selected) return;
         actionError = null;
-        status = "";
+        deleted = false;
         if (!confirming) {
             confirming = true;
             return;
@@ -74,7 +74,7 @@
             applyEntries(result.entries);
             loadError = null;
             confirming = false;
-            status = t("history_deleted");
+            deleted = true;
         } else {
             actionError = result.error;
         }
@@ -134,7 +134,7 @@
     <LoadingStatus message={loading ? t(entries === null ? "history_loading" : "history_refreshing") : ""} />
     {#if loadError}{@render showError(loadError)}{/if}
     {#if actionError}{@render showError(actionError)}{/if}
-    {#if status}<p class="ui-muted" role="status">{status}</p>{/if}
+    {#if deleted}<p class="ui-muted" role="status">{t("history_deleted")}</p>{/if}
     {#if entries?.length === 0}<p class="ui-muted" role="status">{t("history_empty")}</p>{/if}
 
     {#if entries?.length && selected}
@@ -142,7 +142,7 @@
             <label class="ui-field">
                 <span>{t("history_report")}</span>
                 <select class="ui-control" bind:this={selection} bind:value={selectedId} disabled={deleting}
-                    onchange={() => { confirming = false; actionError = null; status = ""; }}>
+                    onchange={() => { confirming = false; actionError = null; deleted = false; }}>
                     {#each entries as entry (entry.id)}
                         <option value={entry.id}>{entryLabel(entry)}</option>
                     {/each}
