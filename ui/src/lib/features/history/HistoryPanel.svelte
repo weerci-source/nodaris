@@ -2,6 +2,7 @@
     import { onMount, tick } from "svelte";
     import Alert from "../../components/ui/Alert.svelte";
     import Button from "../../components/ui/Button.svelte";
+    import Icon from "../../components/ui/Icon.svelte";
     import LoadingStatus from "../../components/ui/LoadingStatus.svelte";
     import Skeleton from "../../components/ui/Skeleton.svelte";
     import { currentLang, t, translateError, type ApiError } from "../../i18n";
@@ -16,6 +17,9 @@
     let entries = $state.raw<HistoryEntry[] | null>(null);
     let selectedId = $state("");
     let selected = $derived(entries?.find((entry) => entry.id === selectedId));
+    let compact = $state(window.matchMedia("(max-width: 760px)").matches);
+    let detailOpen = $state(false);
+    let actionsOpen = $state(false);
     let confirming = $state(false);
     let loading = $state(true);
     let deleting = $state(false);
@@ -23,7 +27,8 @@
     let actionError = $state<ApiError | null>(null);
     let deleted = $state(false);
     let heading: HTMLHeadingElement;
-    let selection = $state<HTMLSelectElement>();
+    let detail: HTMLElement;
+    let actions: HTMLDivElement;
     let active: AbortController | null = null;
     let refreshPending = false;
 
@@ -32,7 +37,68 @@
         if (!next.some((entry) => entry.id === selectedId)) {
             selectedId = next[0]?.id ?? "";
             confirming = false;
+            actionsOpen = false;
+            if (!selectedId) detailOpen = false;
         }
+    }
+
+    function focus(part: string) {
+        document.getElementById(`${id}-${part}`)?.focus();
+    }
+
+    function selectReport(entry: HistoryEntry) {
+        selectedId = entry.id;
+        detailOpen = true;
+        actionsOpen = false;
+        confirming = false;
+        actionError = null;
+        deleted = false;
+        if (compact) void tick().then(() => focus("report-title"));
+    }
+
+    function back() {
+        detailOpen = false;
+        confirming = false;
+        actionsOpen = false;
+        actionError = null;
+        void tick().then(() => focus(`entry-${selectedId}`));
+    }
+
+    function handleActions(event: MouseEvent) {
+        if (actionsOpen && event.target instanceof Node && !actions.contains(event.target)) {
+            actionsOpen = false;
+        }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+        if (event.key !== "Escape" || deleting || !detail?.contains(document.activeElement)) return;
+        if (actionsOpen || confirming) {
+            cancelAction();
+        } else if (compact && detailOpen) {
+            back();
+        } else {
+            return;
+        }
+        event.preventDefault();
+    }
+
+    function toggleActions() {
+        actionsOpen = !actionsOpen;
+        if (actionsOpen) void tick().then(() => focus("delete"));
+    }
+
+    function confirmDelete() {
+        actionsOpen = false;
+        confirming = true;
+        actionError = null;
+        deleted = false;
+        void tick().then(() => focus("confirm"));
+    }
+
+    function cancelAction() {
+        actionsOpen = false;
+        confirming = false;
+        void tick().then(() => focus("actions"));
     }
 
     export async function refresh() {
@@ -57,10 +123,6 @@
         if (deleting || !selected) return;
         actionError = null;
         deleted = false;
-        if (!confirming) {
-            confirming = true;
-            return;
-        }
         active?.abort();
         const controller = new AbortController();
         active = controller;
@@ -75,6 +137,7 @@
             loadError = null;
             confirming = false;
             deleted = true;
+            if (compact) detailOpen = false;
         } else {
             actionError = result.error;
         }
@@ -83,7 +146,9 @@
             void refresh();
         }
         await tick();
-        (selection ?? heading)?.focus();
+        if (!result.ok) focus("confirm");
+        else if (selectedId) focus(`entry-${selectedId}`);
+        else heading.focus();
     }
 
     async function repeat() {
@@ -95,20 +160,30 @@
         }
     }
 
-    function entryLabel(entry: HistoryEntry) {
+    function reportTime(entry: HistoryEntry) {
         const timestamp = entry.kind === "session"
             ? entry.report.started_at.unix_time_ms : entry.report.probes.started_at_unix_ms;
+        return timestamp === null ? t("scan_metric_missing") : time.format(timestamp);
+    }
+
+    function reportInterface(entry: HistoryEntry) {
         const name = entry.kind === "session" ? entry.report.interface : entry.report.link.interface;
-        const type = t(entry.kind === "session" ? "history_kind_session" : "ethernet_title");
-        return [entry.target, timestamp === null ? t("scan_metric_missing") : time.format(timestamp), type, name]
-            .filter(Boolean).join(" · ");
+        return entry.target ? `${name} · ${entry.target}` : name;
     }
 
     onMount(() => {
+        const query = window.matchMedia("(max-width: 760px)");
+        const update = () => { compact = query.matches; };
+        query.addEventListener("change", update);
         void refresh();
-        return () => active?.abort();
+        return () => {
+            active?.abort();
+            query.removeEventListener("change", update);
+        };
     });
 </script>
+
+<svelte:window onclick={handleActions} onkeydown={handleEscape} />
 
 {#snippet showError(error: ApiError)}
     <Alert severity={error.severity}>
@@ -119,61 +194,91 @@
     </Alert>
 {/snippet}
 
-<section id="diagnostic-history" class="card ui-stack ui-section" aria-labelledby={`${id}-title`}>
+<section id="diagnostic-history" class="ui-stack ui-section" aria-labelledby={`${id}-title`}>
     <header class="ui-row ui-row-between">
-        <div>
-            <h2 class="ui-title" id={`${id}-title`} tabindex="-1" bind:this={heading}>{t("history_title")}</h2>
-            <p class="ui-muted">{t("history_retention")}</p>
-        </div>
+        <h2 class="workspace-title" id={`${id}-title`} tabindex="-1" bind:this={heading}>{t("history_title")}</h2>
         <Button variant="secondary" loading={loading} disabled={deleting} onclick={refresh}>
             {t("history_refresh")}
         </Button>
     </header>
 
-    {#if loading && entries === null}<Skeleton />{/if}
+    {#if loading && entries === null}<div class="card"><Skeleton /></div>{/if}
     <LoadingStatus message={loading ? t(entries === null ? "history_loading" : "history_refreshing") : ""} />
     {#if loadError}{@render showError(loadError)}{/if}
-    {#if actionError}{@render showError(actionError)}{/if}
     {#if deleted}<p class="ui-muted" role="status">{t("history_deleted")}</p>{/if}
-    {#if entries?.length === 0}<p class="ui-muted" role="status">{t("history_empty")}</p>{/if}
+    {#if entries?.length === 0}<p class="card ui-muted" role="status">{t("history_empty")}</p>{/if}
 
     {#if entries?.length && selected}
-        <div class="ui-row">
-            <label class="ui-field">
-                <span>{t("history_report")}</span>
-                <select class="ui-control" bind:this={selection} bind:value={selectedId} disabled={deleting}
-                    onchange={() => { confirming = false; actionError = null; deleted = false; }}>
+        <div class="history-layout" class:compact>
+            <ul class="history-list" aria-label={t("history_reports")} hidden={compact && detailOpen}>
                     {#each entries as entry (entry.id)}
-                        <option value={entry.id}>{entryLabel(entry)}</option>
+                    <li>
+                        <button type="button" class="history-entry" disabled={deleting}
+                            id={`${id}-entry-${entry.id}`} aria-current={selectedId === entry.id ? "true" : undefined}
+                            aria-controls={`${id}-report`} onclick={() => selectReport(entry)}>
+                            <span class="history-entry-icon"><Icon name={entry.kind === "session" ? "session" : "ethernet"} /></span>
+                            <span class="history-entry-text">
+                                <strong>{reportInterface(entry)}</strong>
+                                <span>{reportTime(entry)}</span>
+                            </span>
+                        </button>
+                    </li>
                     {/each}
-                </select>
-            </label>
-            <Button variant="secondary" disabled={deleting} onclick={repeat}>
-                {t("history_repeat")}
-            </Button>
-            <Button variant="secondary" loading={deleting} onclick={remove}
-                aria-describedby={confirming ? `${id}-delete-confirmation` : undefined}>
-                {t(confirming ? "history_delete_confirm" : "history_delete")}
-            </Button>
-            {#if confirming}
-                <Button variant="secondary" disabled={deleting} onclick={() => { confirming = false; }}>
-                    {t("connection_cancel")}
-                </Button>
-            {/if}
+            </ul>
+            <article class="card ui-stack history-detail" id={`${id}-report`} aria-labelledby={`${id}-report-title`}
+                bind:this={detail} hidden={compact && !detailOpen}>
+                {#if compact}
+                    <div><Button variant="plain" size="sm" icon="chevron-left" disabled={deleting} onclick={back}>{t("history_back")}</Button></div>
+                {/if}
+                <header class="ui-row ui-row-between">
+                    <div>
+                        <h3 class="ui-title" id={`${id}-report-title`} tabindex="-1">
+                            {t(selected.kind === "session" ? "history_kind_session" : "ethernet_title")}
+                        </h3>
+                        <p class="ui-muted">{reportInterface(selected)} · {reportTime(selected)}</p>
+                    </div>
+                    <div class="ui-row history-controls">
+                        <Button disabled={deleting || confirming} onclick={repeat}>{t("history_repeat")}</Button>
+                        <div class="history-actions" bind:this={actions}>
+                            <Button variant="secondary" icon="more" id={`${id}-actions`}
+                                aria-label={t("history_actions")} aria-expanded={actionsOpen}
+                                aria-controls={actionsOpen ? `${id}-action-list` : undefined}
+                                disabled={deleting || confirming} onclick={toggleActions}>{""}</Button>
+                            {#if actionsOpen}
+                                <div class="history-action-list" id={`${id}-action-list`}>
+                                    <Button variant="plain" class="history-danger" id={`${id}-delete`} onclick={confirmDelete}>
+                                        {t("history_delete")}
+                                    </Button>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </header>
+                {#if confirming}
+                    <div class="ui-stack ui-subsection">
+                        <p id={`${id}-delete-confirmation`} class="ui-muted">{t("history_delete_prompt")}</p>
+                        <div class="ui-row">
+                            <Button variant="secondary" class="history-danger" loading={deleting}
+                                id={`${id}-confirm`} aria-describedby={`${id}-delete-confirmation`} onclick={remove}>
+                                {t("history_delete_confirm")}
+                            </Button>
+                            <Button variant="secondary" disabled={deleting} onclick={cancelAction}>{t("connection_cancel")}</Button>
+                        </div>
+                    </div>
+                {/if}
+                {#if actionError}{@render showError(actionError)}{/if}
+                {#key selected.id}
+                    {#if selected.kind === "session"}
+                        <SessionResult report={selected.report} />
+                    {:else}
+                        <EthernetLinkResult link={selected.report.link} />
+                        <section class="ui-stack ui-subsection" aria-labelledby={`${id}-probes`}>
+                            <h3 class="ui-title" id={`${id}-probes`}>{t("probe_title")}</h3>
+                            <ProbeResult report={selected.report.probes} />
+                        </section>
+                    {/if}
+                {/key}
+            </article>
         </div>
-        {#if confirming}
-            <p id={`${id}-delete-confirmation`} class="ui-muted" role="status">{t("history_delete_prompt")}</p>
-        {/if}
-        {#key selected.id}
-            {#if selected.kind === "session"}
-                <SessionResult report={selected.report} />
-            {:else}
-                <EthernetLinkResult link={selected.report.link} />
-                <section class="ui-stack ui-subsection" aria-labelledby={`${id}-probes`}>
-                    <h3 class="ui-title" id={`${id}-probes`}>{t("probe_title")}</h3>
-                    <ProbeResult report={selected.report.probes} />
-                </section>
-            {/if}
-        {/key}
     {/if}
 </section>
