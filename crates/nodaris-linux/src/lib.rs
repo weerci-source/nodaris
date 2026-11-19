@@ -103,3 +103,97 @@ pub fn scan_wifi() -> Result<Vec<AccessPoint>, CoreError> {
 
     Ok(aps)
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct WifiInterface {
+    pub name: String,
+    pub connected: bool,
+}
+
+pub fn list_wifi_interfaces() -> Result<Vec<WifiInterface>, CoreError> {
+    let output = Command::new("nmcli")
+        .env("LC_ALL", "C")
+        .args(["-t", "-f", "DEVICE,TYPE,STATE", "device", "status"])
+        .output()
+        .map_err(|error| {
+            CoreError::hardware_err(keys::scan::UNKNOWN_FAILURE)
+                .with_tech(format!("Failed to execute nmcli device status: {error}"))
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let error = if stderr.contains("Not authorized") || stderr.contains("Permission denied") {
+            CoreError::permission_err(keys::scan::WIFI_PERMISSION_DENIED)
+        } else {
+            CoreError::hardware_err(keys::scan::UNKNOWN_FAILURE)
+        };
+
+        return Err(error.with_tech(stderr.into_owned()));
+    }
+
+    let stdout = std::str::from_utf8(&output.stdout).map_err(|error| {
+        CoreError::hardware_err(keys::scan::UNKNOWN_FAILURE)
+            .with_tech(format!("Invalid nmcli device status encoding: {error}"))
+    })?;
+
+    parse_wifi_interfaces(stdout)
+}
+
+fn parse_wifi_interfaces(stdout: &str) -> Result<Vec<WifiInterface>, CoreError> {
+    let mut interfaces = Vec::new();
+
+    for line in stdout.lines().filter(|line| !line.trim().is_empty()) {
+        let fields = split_escaped(line, ':');
+        let [name, device_type, state] = fields.as_slice() else {
+            return Err(CoreError::hardware_err(keys::scan::UNKNOWN_FAILURE)
+                .with_tech("Unexpected nmcli DEVICE,TYPE,STATE row format"));
+        };
+
+        if device_type == "wifi" {
+            interfaces.push(WifiInterface {
+                name: name.clone(),
+                connected: matches!(state.as_str(), "connected" | "connected (externally)"),
+            });
+        }
+    }
+
+    Ok(interfaces)
+}
+
+#[cfg(test)]
+mod interface_tests {
+    use super::*;
+
+    #[test]
+    fn lists_wifi_interfaces_without_selecting_one() {
+        let output = concat!(
+            "eth0:ethernet:connected\n",
+            "wlan0:wifi:connected\n",
+            "wlan1:wifi:disconnected\n",
+        );
+
+        let interfaces = parse_wifi_interfaces(output).expect("valid device list");
+
+        assert_eq!(
+            interfaces,
+            vec![
+                WifiInterface {
+                    name: "wlan0".into(),
+                    connected: true,
+                },
+                WifiInterface {
+                    name: "wlan1".into(),
+                    connected: false,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn ethernet_only_machine_has_no_wifi_interfaces() {
+        let interfaces =
+            parse_wifi_interfaces("eth0:ethernet:connected\n").expect("valid device list");
+
+        assert!(interfaces.is_empty());
+    }
+}

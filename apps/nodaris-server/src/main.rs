@@ -39,10 +39,12 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/scan", get(scan_handler))
-        // ИСПОЛЬЗУЕМ fallback_service вместо nest_service
-        .fallback_service(ServeDir::new(static_dir))
-        .route("/api/scan", get(scan_handler))
-        .route("/api/diagnostics/radio", get(radio_api::radio_handler));
+        .route("/api/diagnostics/radio", get(radio_api::radio_handler))
+        .route(
+            "/api/diagnostics/interfaces",
+            get(radio_api::interfaces_handler),
+        )
+        .fallback_service(ServeDir::new(static_dir));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
         .await

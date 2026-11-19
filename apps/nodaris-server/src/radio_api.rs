@@ -191,6 +191,63 @@ fn error_response(status: StatusCode, error: CoreError) -> Response {
         .into_response()
 }
 
+pub(super) async fn interfaces_handler() -> Response {
+    let Ok(permit) = RADIO_SLOT.try_acquire() else {
+        return error_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            CoreError::network_err(keys::diagnostics::RADIO_BUSY),
+        );
+    };
+
+    let worker = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        nodaris_linux::list_wifi_interfaces()
+    });
+
+    match tokio::time::timeout(RESPONSE_TIMEOUT, worker).await {
+        Ok(Ok(Ok(interfaces))) => {
+            let interfaces: Vec<_> = interfaces
+                .into_iter()
+                .map(|interface| {
+                    json!({
+                        "name": interface.name,
+                        "connected": interface.connected,
+                    })
+                })
+                .collect();
+
+            (
+                [(header::CACHE_CONTROL, "no-store")],
+                Json(json!({ "interfaces": interfaces })),
+            )
+                .into_response()
+        }
+        Ok(Ok(Err(error))) => {
+            let status = if matches!(
+                &error.code,
+                nodaris_core::error::ErrorCode::PermissionDenied
+            ) {
+                StatusCode::FORBIDDEN
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            };
+
+            error_response(status, error)
+        }
+        Ok(Err(error)) => {
+            eprintln!("Wi-Fi interface worker failed: {error}");
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                CoreError::internal("Wi-Fi interface worker failed"),
+            )
+        }
+        Err(_) => error_response(
+            StatusCode::GATEWAY_TIMEOUT,
+            CoreError::network_err(keys::diagnostics::RADIO_TIMEOUT),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
