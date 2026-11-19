@@ -7,7 +7,7 @@
     import SignalBadge from "../../components/ui/SignalBadge.svelte";
     import Skeleton from "../../components/ui/Skeleton.svelte";
     import Alert from "../../components/ui/Alert.svelte";
-    import { t, translateError, type ApiError } from "../../i18n";
+    import { currentLang, t, translateError, type ApiError } from "../../i18n";
     import { fetchRadioDiagnostic, fetchWifiInterfaces, type Radio, type WifiInterface } from "./radio-api";
 
     let interfaces = $state<WifiInterface[]>([]);
@@ -22,6 +22,7 @@
     let radioError = $state<ApiError | null>(null);
     let listRequest: AbortController | null = null;
     let radioRequest: AbortController | null = null;
+    const formatSeconds = new Intl.NumberFormat(currentLang, { maximumFractionDigits: 2 });
 
     function resetRadio() {
         radioRequest?.abort();
@@ -87,6 +88,12 @@
         }
     }
 
+    function retryReasonText(reason: string) {
+        const key = `radio_ui_tx_${reason}`;
+        const message = t(key);
+        return message === key ? reasonText(reason) : message;
+    }
+
     onMount(() => {
         void refreshInterfaces();
         return () => {
@@ -117,7 +124,7 @@
         <div class="ui-row">
             <label class="ui-field">
                 <span>{t("radio_ui_interface")}</span>
-                <select class="ui-control" value={selected} disabled={listing}
+                <select class="ui-control" value={selected} disabled={listing || reading}
                     onchange={(event) => void readRadio(event.currentTarget.value)}>
                     <option value="">{t("radio_ui_choose")}</option>
                     {#each interfaces as item (item.name)}
@@ -161,6 +168,40 @@
                     <dd>{radio.snr.status === "available" ? `${radio.snr.db} ${t("unit_db")}` : reasonText(radio.snr.reason)}</dd>
                 </div>
             </dl>
+            {#if radio.retries && radio.retries.status !== "not_collected"}
+                <section class="ui-stack ui-subsection" aria-labelledby="radio-tx-heading">
+                    <h3 class="ui-title" id="radio-tx-heading">{t("radio_ui_tx_title")}</h3>
+                    {#if radio.retries.status === "available"}
+                        <dl class="ui-metrics">
+                            <div>
+                                <dt>{t("radio_ui_tx_retries")}</dt>
+                                <dd>{radio.retries.retries_delta ?? t("radio_ui_unavailable")}</dd>
+                            </div>
+                            <div>
+                                <dt>{t("radio_ui_tx_failures")}</dt>
+                                <dd>{radio.retries.failed_delta ?? t("radio_ui_unavailable")}</dd>
+                            </div>
+                            <div>
+                                <dt>{t("radio_ui_tx_interval")}</dt>
+                                <dd>{t("radio_ui_seconds_value", [formatSeconds.format(radio.retries.interval_ns / 1e9)])}</dd>
+                            </div>
+                            {#if radio.retries.retry_rate_percent !== null}
+                                <div>
+                                    <dt>{t("radio_ui_tx_rate")}</dt>
+                                    <dd>{radio.retries.retry_rate_percent}%</dd>
+                                </div>
+                            {/if}
+                        </dl>
+                        {#if radio.retries.attempts_delta === null}
+                            <p class="ui-muted">{t("radio_ui_tx_missing_attempt_counter")}</p>
+                        {/if}
+                    {:else}
+                        <p class="ui-muted" role="status">
+                            <Icon name="warning" /> {retryReasonText(radio.retries.reason)}
+                        </p>
+                    {/if}
+                </section>
+            {/if}
         {/if}
     {:else if !listing && !listError}
         <p class="ui-muted" role="status">{t("radio_ui_no_interfaces")}</p>

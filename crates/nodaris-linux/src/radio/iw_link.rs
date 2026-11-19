@@ -1,38 +1,15 @@
-use std::{io::ErrorKind, path::Path, process::Command};
-
 use nodaris_core::models::measurement::UnavailableReason;
+
+use super::command;
 
 pub(super) struct IwLink {
     pub(super) bssid: String,
     pub(super) frequency_mhz: u32,
-    pub(super) rssi_dbm: i16,
+    pub(super) rssi_dbm: Option<i16>,
 }
 
 pub(super) fn read_link(interface: &str) -> Result<IwLink, UnavailableReason> {
-    let iw = ["/usr/sbin/iw", "/sbin/iw"]
-        .into_iter()
-        .find(|path| Path::new(path).is_file())
-        .unwrap_or("iw");
-    // Ограничиваем время жизни самой команды, а не только ожидание HTTP-ответа.
-    let output = Command::new("timeout")
-        .env("LC_ALL", "C")
-        .args(["--kill-after=1s", "2s", iw, "dev", interface, "link"])
-        .output()
-        .map_err(|error| match error.kind() {
-            ErrorKind::NotFound => UnavailableReason::NotSupported,
-            ErrorKind::PermissionDenied => UnavailableReason::PermissionDenied,
-            _ => UnavailableReason::TemporarilyUnavailable,
-        })?;
-
-    match output.status.code() {
-        Some(0) => {}
-        Some(127) => return Err(UnavailableReason::NotSupported),
-        Some(126) => return Err(UnavailableReason::PermissionDenied),
-        _ => return Err(UnavailableReason::TemporarilyUnavailable),
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_link(&stdout)
+    parse_link(&command::read_iw(&["dev", interface, "link"])?)
 }
 
 fn parse_link(output: &str) -> Result<IwLink, UnavailableReason> {
@@ -103,7 +80,7 @@ fn parse_link(output: &str) -> Result<IwLink, UnavailableReason> {
     Ok(IwLink {
         bssid: bssid.to_owned(),
         frequency_mhz: frequency_mhz.ok_or(UnavailableReason::NotMeasured)?,
-        rssi_dbm: rssi_dbm.ok_or(UnavailableReason::NotMeasured)?,
+        rssi_dbm,
     })
 }
 
@@ -119,7 +96,7 @@ mod tests {
         let link = parse_link(LINK).unwrap();
         assert_eq!(link.bssid, "aa:bb:cc:dd:ee:ff");
         assert_eq!(link.frequency_mhz, 5260);
-        assert_eq!(link.rssi_dbm, -57);
+        assert_eq!(link.rssi_dbm, Some(-57));
     }
 
     #[test]
@@ -144,6 +121,6 @@ mod tests {
         let link = parse_link(&output).expect("valid iw link");
 
         assert_eq!(link.frequency_mhz, 5260);
-        assert_eq!(link.rssi_dbm, -57);
+        assert_eq!(link.rssi_dbm, Some(-57));
     }
 }

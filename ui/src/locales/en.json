@@ -109,5 +109,20 @@
     "probe_reason_permission_denied": "Permission to look up the route or send ICMP was denied.",
     "probe_reason_process_timeout": "A system command timed out.",
     "probe_reason_measurement_failed": "The system utility could not run the probe.",
-    "probe_reason_invalid_output": "Could not parse the system utility’s output."
+    "probe_reason_invalid_output": "Could not parse the system utility’s output.",
+    "radio_ui_tx_title": "Wi-Fi transmissions over the interval",
+    "radio_ui_tx_retries": "Retry attempts",
+    "radio_ui_tx_failures": "Transmission failures",
+    "radio_ui_tx_interval": "Counter sampling interval",
+    "radio_ui_seconds_value": "{0} s",
+    "radio_ui_tx_rate": "Retry rate",
+    "radio_ui_tx_missing_attempt_counter": "A comparable attempt counter is required to calculate the retry rate.",
+    "radio_ui_tx_missing_counters": "The driver did not provide comparable counters for both samples.",
+    "radio_ui_tx_association_unverified": "The driver did not provide an association timestamp to verify the connection.",
+    "radio_ui_tx_connection_changed": "Could not verify that both samples used the same connection and channel.",
+    "radio_ui_tx_counter_reset": "A counter decreased between samples. Run the measurement again.",
+    "radio_ui_tx_not_supported": "Reading transmission counters is unavailable on this system.",
+    "radio_ui_tx_not_measured": "No counter sample is available for the active access point.",
+    "radio_ui_tx_invalid_measurement": "Could not validate the counter samples.",
+    "radio_ui_tx_temporarily_unavailable": "Could not read the counters. Run the measurement again."
 }

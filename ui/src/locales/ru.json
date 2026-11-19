@@ -109,5 +109,20 @@
     "probe_reason_permission_denied": "Недостаточно прав для чтения маршрута или отправки ICMP.",
     "probe_reason_process_timeout": "Системная команда не завершилась вовремя.",
     "probe_reason_measurement_failed": "Системная утилита не смогла выполнить пробу.",
-    "probe_reason_invalid_output": "Не удалось разобрать вывод системной утилиты."
+    "probe_reason_invalid_output": "Не удалось разобрать вывод системной утилиты.",
+    "radio_ui_tx_title": "Передача Wi-Fi за интервал",
+    "radio_ui_tx_retries": "Повторные попытки",
+    "radio_ui_tx_failures": "Отказы передачи",
+    "radio_ui_tx_interval": "Интервал чтения счётчиков",
+    "radio_ui_seconds_value": "{0} с",
+    "radio_ui_tx_rate": "Доля повторов",
+    "radio_ui_tx_missing_attempt_counter": "Для расчёта процента повторов нужен сопоставимый счётчик попыток.",
+    "radio_ui_tx_missing_counters": "Драйвер не предоставил сопоставимые счётчики для двух снимков.",
+    "radio_ui_tx_association_unverified": "Драйвер не предоставил метку ассоциации для проверки соединения.",
+    "radio_ui_tx_connection_changed": "Не удалось подтвердить, что оба снимка относятся к одному подключению и каналу.",
+    "radio_ui_tx_counter_reset": "Счётчик уменьшился между снимками. Повторите измерение.",
+    "radio_ui_tx_not_supported": "На этой системе чтение счётчиков передачи недоступно.",
+    "radio_ui_tx_not_measured": "Снимок счётчиков активной точки доступа недоступен.",
+    "radio_ui_tx_invalid_measurement": "Не удалось проверить снимки счётчиков.",
+    "radio_ui_tx_temporarily_unavailable": "Не удалось прочитать счётчики. Повторите измерение."
 }

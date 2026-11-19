@@ -1,6 +1,8 @@
+mod command;
 mod iw_link;
 mod nmcli;
 mod report;
+mod station;
 
 #[cfg(test)]
 mod tests;

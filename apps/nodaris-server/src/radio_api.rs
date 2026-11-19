@@ -16,6 +16,7 @@ use nodaris_core::{
         diagnostic_report::{DiagnosticReport, ReportSection},
         measurement::{MeasurementSessionId, ObservationTime, UnavailableReason},
         radio_observation::{InterfaceId, SnrResult, SnrUnavailableReason},
+        retries::{RetryCalculation, RetryCounterSemantics, RetryUnavailableReason},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,8 @@ use tokio::sync::Semaphore;
 static RADIO_SLOT: Semaphore = Semaphore::const_new(1);
 static NEXT_SESSION: AtomicU64 = AtomicU64::new(0);
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
+// Five bounded commands plus the gap between TX samples.
+const RADIO_RESPONSE_TIMEOUT: Duration = Duration::from_secs(14);
 const MAX_SNR_TIME_DIFFERENCE_NS: u64 = 1_000_000;
 
 #[derive(Deserialize)]
@@ -36,6 +39,24 @@ pub(super) struct RadioQuery {
 struct RadioResponse {
     interface: String,
     radio: RadioSection,
+    retries: RetrySection,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum RetrySection {
+    NotCollected,
+    Unavailable {
+        reason: &'static str,
+    },
+    Available {
+        retries_delta: Option<u64>,
+        failed_delta: Option<u64>,
+        attempts_delta: Option<u64>,
+        retry_rate_percent: Option<u16>,
+        interval_ns: u64,
+        semantics: RetryCounterSemantics,
+    },
 }
 
 #[derive(Serialize)]
@@ -101,7 +122,7 @@ pub(super) async fn radio_handler(query: Result<Query<RadioQuery>, QueryRejectio
         )
     });
 
-    match tokio::time::timeout(RESPONSE_TIMEOUT, worker).await {
+    match tokio::time::timeout(RADIO_RESPONSE_TIMEOUT, worker).await {
         Ok(Ok(report)) => (
             [(header::CACHE_CONTROL, "no-store")],
             Json(encode_radio(interface, report)),
@@ -166,7 +187,58 @@ fn encode_radio(interface: String, report: DiagnosticReport) -> RadioResponse {
         },
     };
 
-    RadioResponse { interface, radio }
+    RadioResponse {
+        interface,
+        radio,
+        retries: encode_retries(report.retries),
+    }
+}
+
+fn encode_retries(retries: ReportSection<RetryCalculation>) -> RetrySection {
+    use RetryUnavailableReason as Reason;
+
+    match retries {
+        ReportSection::NotCollected => RetrySection::NotCollected,
+        ReportSection::Unavailable(reason) => RetrySection::Unavailable {
+            reason: collection_reason(reason),
+        },
+        ReportSection::Available(RetryCalculation::Unavailable(reason)) => {
+            RetrySection::Unavailable {
+                reason: match reason {
+                    Reason::ConnectionChanged => "connection_changed",
+                    Reason::AssociationUnverified => "association_unverified",
+                    Reason::CounterReset => "counter_reset",
+                    Reason::MissingRetryCounter
+                    | Reason::MissingFailureCounter
+                    | Reason::MissingCounters => "missing_counters",
+                    Reason::MissingAttemptCounter => "missing_attempt_counter",
+                    Reason::DifferentInterface
+                    | Reason::DifferentSources
+                    | Reason::DifferentSessions
+                    | Reason::NonIncreasingTime
+                    | Reason::InvalidCounterValues
+                    | Reason::IncompatibleSemantics => "invalid_measurement",
+                    Reason::CountersUnavailable(reason) => collection_reason(reason),
+                },
+            }
+        }
+        ReportSection::Available(RetryCalculation::DeltasOnly(result)) => RetrySection::Available {
+            retries_delta: result.retries_delta,
+            failed_delta: result.failed_delta,
+            attempts_delta: None,
+            retry_rate_percent: None,
+            interval_ns: result.interval_ns,
+            semantics: result.semantics,
+        },
+        ReportSection::Available(RetryCalculation::Available(result)) => RetrySection::Available {
+            retries_delta: Some(result.retries_delta),
+            failed_delta: result.failed_delta,
+            attempts_delta: Some(result.attempts_delta),
+            retry_rate_percent: result.retry_rate_percent,
+            interval_ns: result.interval_ns,
+            semantics: result.semantics,
+        },
+    }
 }
 
 fn collection_reason(reason: UnavailableReason) -> &'static str {
@@ -286,6 +358,7 @@ mod tests {
                         "reason": "rssi_unavailable",
                     },
                 },
+                "retries": { "status": "not_collected" },
             }),
         );
     }
@@ -305,7 +378,34 @@ mod tests {
                     "status": "unavailable",
                     "reason": "not_measured",
                 },
+                "retries": { "status": "not_collected" },
             }),
+        );
+    }
+
+    #[test]
+    fn json_keeps_zero_delta_and_omits_the_unmeasured_rate() {
+        use nodaris_core::models::retries::RetryDeltas;
+
+        let retries = encode_retries(ReportSection::Available(RetryCalculation::DeltasOnly(
+            RetryDeltas {
+                retries_delta: Some(0),
+                failed_delta: None,
+                interval_ns: 1_000_000_000,
+                semantics: RetryCounterSemantics::RetryAttempts,
+            },
+        )));
+        assert_eq!(
+            serde_json::to_value(retries).unwrap(),
+            json!({
+                "status": "available",
+                "retries_delta": 0,
+                "failed_delta": null,
+                "attempts_delta": null,
+                "retry_rate_percent": null,
+                "interval_ns": 1_000_000_000u64,
+                "semantics": "retry_attempts",
+            })
         );
     }
 }

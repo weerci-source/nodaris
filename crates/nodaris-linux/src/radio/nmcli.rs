@@ -1,5 +1,3 @@
-use std::{io::ErrorKind, process::Command};
-
 use nodaris_core::models::{
     measurement::UnavailableReason,
     radio::SignalQualityPercent,
@@ -7,6 +5,8 @@ use nodaris_core::models::{
 };
 
 use crate::split_escaped;
+
+use super::command;
 
 pub(super) struct ConnectedAp {
     pub(super) bssid: Bssid,
@@ -19,9 +19,9 @@ pub(super) fn read_connected_ap(interface: &InterfaceId) -> Result<ConnectedAp, 
         return Err(UnavailableReason::NotConfigured);
     }
 
-    let output = Command::new("nmcli")
-        .env("LC_ALL", "C")
-        .args([
+    let output = command::run(
+        "nmcli",
+        &[
             "-t",
             "-f",
             "IN-USE,BSSID,SIGNAL,FREQ",
@@ -29,15 +29,15 @@ pub(super) fn read_connected_ap(interface: &InterfaceId) -> Result<ConnectedAp, 
             "wifi",
             "list",
             "ifname",
-        ])
-        .arg(&interface.0)
-        .args(["--rescan", "no"])
-        .output()
-        .map_err(|error| match error.kind() {
-            ErrorKind::NotFound => UnavailableReason::NotConfigured,
-            ErrorKind::PermissionDenied => UnavailableReason::PermissionDenied,
-            _ => UnavailableReason::TemporarilyUnavailable,
-        })?;
+            &interface.0,
+            "--rescan",
+            "no",
+        ],
+    )
+    .map_err(|reason| match reason {
+        UnavailableReason::NotSupported => UnavailableReason::NotConfigured,
+        _ => reason,
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_ascii_lowercase();

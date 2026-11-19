@@ -18,7 +18,7 @@ fn link(bssid: &str, frequency_mhz: u32) -> IwLink {
     IwLink {
         bssid: bssid.into(),
         frequency_mhz,
-        rssi_dbm: -57,
+        rssi_dbm: Some(-57),
     }
 }
 

@@ -3,13 +3,22 @@ import { toApiError, type ApiError } from "../../i18n";
 export type WifiInterface = { name: string; connected: boolean };
 type Unavailable = { status: "unavailable"; reason: string };
 type Snr = Unavailable | { status: "available"; db: number };
-export type Radio = Unavailable | {
+type Retries = Unavailable | { status: "not_collected" } | {
+    status: "available";
+    retries_delta: number | null;
+    failed_delta: number | null;
+    attempts_delta: number | null;
+    retry_rate_percent: number | null;
+    interval_ns: number;
+};
+type RadioReading = Unavailable | {
     status: "available";
     frequency_mhz: number | null;
     signal_quality_percent: number | null;
     rssi_dbm?: number | null;
     snr: Snr;
 };
+export type Radio = RadioReading & { retries?: Retries };
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
@@ -31,7 +40,7 @@ function isSnr(value: unknown): value is Snr {
         (isRecord(value) && value.status === "available" && isInteger(value.db));
 }
 
-function isRadio(value: unknown): value is Radio {
+function isRadio(value: unknown): value is RadioReading {
     if (isUnavailable(value)) return true;
     if (!isRecord(value) || value.status !== "available") return false;
     const { frequency_mhz: frequency, signal_quality_percent: quality, rssi_dbm: rssi } = value;
@@ -39,6 +48,17 @@ function isRadio(value: unknown): value is Radio {
         (quality === null || (isInteger(quality) && quality >= 0 && quality <= 100)) &&
         (rssi === undefined || rssi === null || (isInteger(rssi) && rssi < 0)) &&
         isSnr(value.snr);
+}
+
+function isRetries(value: unknown): value is Retries {
+    if (isUnavailable(value)) return true;
+    if (!isRecord(value)) return false;
+    if (value.status === "not_collected") return true;
+    const { interval_ns: interval, retry_rate_percent: rate } = value;
+    return value.status === "available" && isInteger(interval) && interval > 0 &&
+        [value.retries_delta, value.failed_delta, value.attempts_delta]
+            .every((delta) => delta === null || (isInteger(delta) && delta >= 0)) &&
+        (rate === null || (isInteger(rate) && rate >= 0 && rate <= 100));
 }
 
 function isWifiInterface(value: unknown): value is WifiInterface {
@@ -92,6 +112,9 @@ export function fetchWifiInterfaces(signal: AbortSignal): Promise<Result<WifiInt
 
 export function fetchRadioDiagnostic(name: string, signal: AbortSignal): Promise<Result<Radio>> {
     const query = new URLSearchParams({ interface: name });
-    return get(`/api/diagnostics/radio?${query}`, signal, (body) =>
-        isRecord(body) && body.interface === name && isRadio(body.radio) ? body.radio : null);
+    return get(`/api/diagnostics/radio?${query}`, signal, (body) => {
+        if (!isRecord(body) || body.interface !== name || !isRadio(body.radio)) return null;
+        if (body.retries === undefined) return body.radio;
+        return isRetries(body.retries) ? { ...body.radio, retries: body.retries } : null;
+    });
 }

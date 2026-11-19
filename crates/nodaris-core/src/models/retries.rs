@@ -59,6 +59,9 @@ pub enum RetryUnavailableReason {
     MissingFailureCounter,
     InvalidCounterValues,
     IncompatibleSemantics,
+    ConnectionChanged,
+    AssociationUnverified,
+    MissingCounters,
 }
 
 /// Результат расчёта повторных передач.
@@ -85,55 +88,30 @@ pub struct RetryResult {
     pub semantics: RetryCounterSemantics,
 }
 
+/// Дельты для источников, у которых нет сопоставимого числа попыток.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryDeltas {
+    pub retries_delta: Option<u64>,
+    pub failed_delta: Option<u64>,
+    pub interval_ns: u64,
+    pub semantics: RetryCounterSemantics,
+}
+
 /// Результат сравнения двух снимков.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RetryCalculation {
     Available(RetryResult),
+    DeltasOnly(RetryDeltas),
     Unavailable(RetryUnavailableReason),
 }
 
 /// Вычисляет дельты счётчиков передачи.
 pub fn calculate_retries(previous: &RetrySnapshot, current: &RetrySnapshot) -> RetryCalculation {
-    if previous.interface != current.interface {
-        return RetryCalculation::Unavailable(RetryUnavailableReason::DifferentInterface);
-    }
-
-    let previous_counters = match &previous.counters.state {
-        MeasurementState::Available(value) => value,
-        MeasurementState::Unavailable(reason) => {
-            return RetryCalculation::Unavailable(RetryUnavailableReason::CountersUnavailable(
-                *reason,
-            ));
-        }
-    };
-
-    let current_counters = match &current.counters.state {
-        MeasurementState::Available(value) => value,
-        MeasurementState::Unavailable(reason) => {
-            return RetryCalculation::Unavailable(RetryUnavailableReason::CountersUnavailable(
-                *reason,
-            ));
-        }
-    };
-
-    if previous.counters.source != current.counters.source {
-        return RetryCalculation::Unavailable(RetryUnavailableReason::DifferentSources);
-    }
-
-    let previous_time = &previous.counters.observed_at;
-    let current_time = &current.counters.observed_at;
-
-    if previous_time.session_id != current_time.session_id {
-        return RetryCalculation::Unavailable(RetryUnavailableReason::DifferentSessions);
-    }
-
-    if current_time.monotonic_time_ns <= previous_time.monotonic_time_ns {
-        return RetryCalculation::Unavailable(RetryUnavailableReason::NonIncreasingTime);
-    }
-
-    if previous_counters.retry_semantics != current_counters.retry_semantics {
-        return RetryCalculation::Unavailable(RetryUnavailableReason::IncompatibleSemantics);
-    }
+    let (previous_counters, current_counters, interval_ns) =
+        match comparable_counters(previous, current) {
+            Ok(pair) => pair,
+            Err(reason) => return RetryCalculation::Unavailable(reason),
+        };
 
     let previous_retries = match previous_counters.tx_retries {
         Some(value) => value,
@@ -163,23 +141,17 @@ pub fn calculate_retries(previous: &RetrySnapshot, current: &RetrySnapshot) -> R
         }
     };
 
-    let failed_delta = match (previous_counters.tx_failed, current_counters.tx_failed) {
-        (Some(previous), Some(current)) => {
-            if current < previous {
-                return RetryCalculation::Unavailable(RetryUnavailableReason::CounterReset);
-            }
-
-            Some(current - previous)
-        }
-        _ => None,
+    let failed_delta = match counter_delta(previous_counters.tx_failed, current_counters.tx_failed)
+    {
+        Ok(delta) => delta,
+        Err(reason) => return RetryCalculation::Unavailable(reason),
     };
-
-    if current_retries < previous_retries || current_attempts < previous_attempts {
+    let (Some(retries_delta), Some(attempts_delta)) = (
+        current_retries.checked_sub(previous_retries),
+        current_attempts.checked_sub(previous_attempts),
+    ) else {
         return RetryCalculation::Unavailable(RetryUnavailableReason::CounterReset);
-    }
-
-    let retries_delta = current_retries - previous_retries;
-    let attempts_delta = current_attempts - previous_attempts;
+    };
 
     if retries_delta > attempts_delta {
         return RetryCalculation::Unavailable(RetryUnavailableReason::InvalidCounterValues);
@@ -200,9 +172,101 @@ pub fn calculate_retries(previous: &RetrySnapshot, current: &RetrySnapshot) -> R
         attempts_delta,
         failed_delta,
         retry_rate_percent,
-        interval_ns: current_time.monotonic_time_ns - previous_time.monotonic_time_ns,
+        interval_ns,
         semantics: current_counters.retry_semantics,
     })
+}
+
+/// Сравнивает только повторы и отказы. Отсутствие отдельного счётчика
+/// сохраняется в результате, если получена дельта другого счётчика.
+pub fn calculate_retry_deltas(
+    previous: &RetrySnapshot,
+    current: &RetrySnapshot,
+) -> RetryCalculation {
+    match retry_deltas(previous, current) {
+        Ok(deltas) => RetryCalculation::DeltasOnly(deltas),
+        Err(reason) => RetryCalculation::Unavailable(reason),
+    }
+}
+
+fn retry_deltas(
+    previous: &RetrySnapshot,
+    current: &RetrySnapshot,
+) -> Result<RetryDeltas, RetryUnavailableReason> {
+    let (previous, current, interval_ns) = comparable_counters(previous, current)?;
+    let retries_delta = counter_delta(previous.tx_retries, current.tx_retries)?;
+    let failed_delta = counter_delta(previous.tx_failed, current.tx_failed)?;
+    if retries_delta.is_none() && failed_delta.is_none() {
+        return Err(RetryUnavailableReason::MissingCounters);
+    }
+
+    Ok(RetryDeltas {
+        retries_delta,
+        failed_delta,
+        interval_ns,
+        semantics: current.retry_semantics,
+    })
+}
+
+fn comparable_counters<'a>(
+    previous: &'a RetrySnapshot,
+    current: &'a RetrySnapshot,
+) -> Result<(&'a RetryCounters, &'a RetryCounters, u64), RetryUnavailableReason> {
+    if previous.interface != current.interface {
+        return Err(RetryUnavailableReason::DifferentInterface);
+    }
+
+    let previous_counters = match &previous.counters.state {
+        MeasurementState::Available(value) => value,
+        MeasurementState::Unavailable(reason) => {
+            return Err(RetryUnavailableReason::CountersUnavailable(*reason));
+        }
+    };
+
+    let current_counters = match &current.counters.state {
+        MeasurementState::Available(value) => value,
+        MeasurementState::Unavailable(reason) => {
+            return Err(RetryUnavailableReason::CountersUnavailable(*reason));
+        }
+    };
+
+    if previous.counters.source != current.counters.source {
+        return Err(RetryUnavailableReason::DifferentSources);
+    }
+
+    let previous_time = &previous.counters.observed_at;
+    let current_time = &current.counters.observed_at;
+
+    if previous_time.session_id != current_time.session_id {
+        return Err(RetryUnavailableReason::DifferentSessions);
+    }
+
+    if current_time.monotonic_time_ns <= previous_time.monotonic_time_ns {
+        return Err(RetryUnavailableReason::NonIncreasingTime);
+    }
+
+    if previous_counters.retry_semantics != current_counters.retry_semantics {
+        return Err(RetryUnavailableReason::IncompatibleSemantics);
+    }
+
+    Ok((
+        previous_counters,
+        current_counters,
+        current_time.monotonic_time_ns - previous_time.monotonic_time_ns,
+    ))
+}
+
+fn counter_delta(
+    previous: Option<u64>,
+    current: Option<u64>,
+) -> Result<Option<u64>, RetryUnavailableReason> {
+    match (previous, current) {
+        (Some(previous), Some(current)) => current
+            .checked_sub(previous)
+            .map(Some)
+            .ok_or(RetryUnavailableReason::CounterReset),
+        _ => Ok(None),
+    }
 }
 
 #[cfg(test)]
@@ -233,6 +297,42 @@ mod tests {
                 },
             ),
         }
+    }
+
+    #[test]
+    fn calculates_unrated_deltas_when_attempts_are_missing() {
+        let first = snapshot(None, Some(100), Some(8), 1_000);
+        let last = snapshot(None, Some(103), Some(8), 2_000);
+        assert_eq!(
+            calculate_retry_deltas(&first, &last),
+            RetryCalculation::DeltasOnly(RetryDeltas {
+                retries_delta: Some(3),
+                failed_delta: Some(0),
+                interval_ns: 1_000,
+                semantics: RetryCounterSemantics::RetryAttempts,
+            }),
+        );
+    }
+
+    #[test]
+    fn keeps_available_deltas_when_retry_counter_is_absent() {
+        let first = snapshot(None, None, Some(4), 1_000);
+        let last = snapshot(None, Some(103), Some(7), 2_000);
+        let RetryCalculation::DeltasOnly(deltas) = calculate_retry_deltas(&first, &last) else {
+            panic!("Expected a failure delta");
+        };
+        assert_eq!(deltas.retries_delta, None);
+        assert_eq!(deltas.failed_delta, Some(3));
+    }
+
+    #[test]
+    fn rejects_unrated_deltas_after_counter_reset() {
+        let first = snapshot(None, Some(100), Some(4), 1_000);
+        let last = snapshot(None, Some(3), Some(0), 2_000);
+        assert_eq!(
+            calculate_retry_deltas(&first, &last),
+            RetryCalculation::Unavailable(RetryUnavailableReason::CounterReset),
+        );
     }
 
     #[test]

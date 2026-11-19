@@ -1,0 +1,6 @@
+Station 02:00:00:00:00:01 (on wlan0)
+	tx packets:	465181
+	tx retries:	0
+	tx failed:	0
+	connected time:	45249 seconds
+	associated at [boottime]:	43829.604s
