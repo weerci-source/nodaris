@@ -121,7 +121,7 @@ pub(super) async fn radio_handler(query: Result<Query<RadioQuery>, QueryRejectio
     }
 }
 
-fn valid_interface_name(name: &str) -> bool {
+pub(super) fn valid_interface_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 15
         && !name.starts_with('-')
@@ -182,7 +182,7 @@ fn collection_reason(reason: UnavailableReason) -> &'static str {
     }
 }
 
-fn error_response(status: StatusCode, error: CoreError) -> Response {
+pub(super) fn error_response(status: StatusCode, error: CoreError) -> Response {
     (
         status,
         Json(json!({

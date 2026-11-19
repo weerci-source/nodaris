@@ -1,4 +1,5 @@
 <script lang="ts">
+    import NetworkProbes from "../probes/NetworkProbes.svelte";
     import { onMount } from "svelte";
     import Button from "../../components/ui/Button.svelte";
     import Icon from "../../components/ui/Icon.svelte";
@@ -163,5 +164,10 @@
         {/if}
     {:else if !listing && !listError}
         <p class="ui-muted" role="status">{t("radio_ui_no_interfaces")}</p>
+    {/if}
+    {#if selected}
+        {#key selected}
+            <NetworkProbes wifiInterface={selected} />
+        {/key}
     {/if}
 </section>

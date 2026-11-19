@@ -2,6 +2,7 @@ pub mod access_point;
 pub mod airtime;
 pub mod connection;
 pub mod diagnostic_report;
+pub mod icmp;
 pub mod measurement;
 pub mod radio;
 pub mod radio_observation;

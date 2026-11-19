@@ -13,4 +13,7 @@ pub mod diagnostics {
     pub const INVALID_INTERFACE: &str = "diagnostics_invalid_interface";
     pub const RADIO_BUSY: &str = "diagnostics_radio_busy";
     pub const RADIO_TIMEOUT: &str = "diagnostics_radio_timeout";
+    pub const PROBE_INVALID_REQUEST: &str = "diagnostics_probe_invalid_request";
+    pub const PROBE_FORBIDDEN: &str = "diagnostics_probe_forbidden";
+    pub const PROBE_BUSY: &str = "diagnostics_probe_busy";
 }

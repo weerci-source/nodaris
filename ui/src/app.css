@@ -133,3 +133,11 @@ button, input, select { font: inherit; }
 
 .ui-metrics dt { color: var(--color-text-muted); }
 .ui-metrics dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+
+.ui-subsection {
+    min-inline-size: 0;
+    padding-block-start: var(--space-3);
+    border-block-start: 1px solid var(--color-border);
+}
+
+.ui-field-error { flex-basis: 100%; }

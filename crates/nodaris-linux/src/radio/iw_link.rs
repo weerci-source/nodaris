@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, process::Command};
+use std::{io::ErrorKind, path::Path, process::Command};
 
 use nodaris_core::models::measurement::UnavailableReason;
 
@@ -9,10 +9,14 @@ pub(super) struct IwLink {
 }
 
 pub(super) fn read_link(interface: &str) -> Result<IwLink, UnavailableReason> {
+    let iw = ["/usr/sbin/iw", "/sbin/iw"]
+        .into_iter()
+        .find(|path| Path::new(path).is_file())
+        .unwrap_or("iw");
     // Ограничиваем время жизни самой команды, а не только ожидание HTTP-ответа.
     let output = Command::new("timeout")
         .env("LC_ALL", "C")
-        .args(["--kill-after=1s", "2s", "iw", "dev", interface, "link"])
+        .args(["--kill-after=1s", "2s", iw, "dev", interface, "link"])
         .output()
         .map_err(|error| match error.kind() {
             ErrorKind::NotFound => UnavailableReason::NotSupported,

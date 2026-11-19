@@ -1,10 +1,12 @@
 use async_trait::async_trait;
+use serde::Serialize;
 
 use crate::error::CoreError;
 
 use super::info::ProviderInfo;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProbeMethod {
     Icmp,
     Tcp,

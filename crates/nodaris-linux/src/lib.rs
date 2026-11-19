@@ -1,5 +1,7 @@
+mod icmp;
 mod radio;
 
+pub use icmp::collect_icmp_report;
 pub use radio::collect_radio_report;
 
 use nodaris_core::{error::CoreError, keys, models::access_point::AccessPoint};
