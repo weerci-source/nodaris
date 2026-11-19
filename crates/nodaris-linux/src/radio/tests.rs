@@ -61,11 +61,7 @@ fn accepts_rssi_from_the_same_ap_and_frequency() {
     let signal_quality = observation.signal_quality.as_ref().expect("quality state");
     assert_eq!(signal_quality.source.0, "linux.network_manager");
 
-    let noise = observation.noise.as_ref().expect("noise state");
-    assert!(matches!(
-        &noise.state,
-        MeasurementState::Unavailable(UnavailableReason::NotSupported)
-    ));
+    assert!(observation.noise.is_none());
 }
 
 #[test]

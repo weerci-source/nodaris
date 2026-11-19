@@ -141,3 +141,9 @@ button, input, select { font: inherit; }
 }
 
 .ui-field-error { flex-basis: 100%; }
+
+.connection-events {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}

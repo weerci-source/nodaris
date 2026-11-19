@@ -10,9 +10,10 @@ use super::{
     iw_link::{self, IwLink},
     nmcli::{self, ConnectedAp},
     station,
+    survey::{self, SurveyReport},
 };
 
-/// Читает сведения об активной точке из NetworkManager и RSSI через iw.
+/// Читает сведения об активной точке, RSSI, survey и TX-счётчики.
 /// read_time фиксирует окончание чтения, а не момент измерения драйвером.
 pub fn collect_radio_report(
     interface: &InterfaceId,
@@ -27,11 +28,17 @@ pub fn collect_radio_report(
                 max_snr_time_difference_ns,
             );
             report.retries = ReportSection::Unavailable(reason);
+            report.airtime = ReportSection::Unavailable(reason);
             return report;
         }
     };
     let link = iw_link::read_link(&interface.0);
     let observed_at = read_time();
+    let survey = match &link {
+        Ok(link) if matches_ap(&ap, link) => survey::collect(interface, link, &read_time),
+        Ok(_) => SurveyReport::unavailable(UnavailableReason::ContextChanged, observed_at.clone()),
+        Err(reason) => SurveyReport::unavailable(*reason, observed_at.clone()),
+    };
     let retries = match &link {
         Ok(link) if matches_ap(&ap, link) => station::collect_retries(interface, link, &read_time),
         Ok(_) => ReportSection::Available(RetryCalculation::Unavailable(
@@ -39,10 +46,13 @@ pub fn collect_radio_report(
         )),
         Err(reason) => ReportSection::Unavailable(*reason),
     };
+    let mut observation = to_observation(interface, ap, link, observed_at);
+    observation.noise = Some(survey.noise);
     let mut report = DiagnosticReport::from_radio(
-        ReportSection::Available(to_observation(interface, ap, link, observed_at)),
+        ReportSection::Available(observation),
         max_snr_time_difference_ns,
     );
+    report.airtime = survey.airtime;
     report.retries = retries;
     report
 }
@@ -75,11 +85,7 @@ pub(super) fn to_observation(
         bssid: Some(ap.bssid),
         frequency: ap.frequency,
         rssi: Some(rssi),
-        noise: Some(Measurement::unavailable(
-            UnavailableReason::NotSupported,
-            nmcli_source,
-            observed_at,
-        )),
+        noise: None,
         signal_quality: Some(signal_quality),
     }
 }

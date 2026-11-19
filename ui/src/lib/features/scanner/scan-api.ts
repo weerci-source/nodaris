@@ -16,7 +16,9 @@ export async function fetchScan(signal: AbortSignal): Promise<ScanResult> {
         try {
             body = await invoke<unknown>("scan_wifi");
         } catch (error: unknown) {
-            return { ok: false, error: toApiError(error) };
+            return { ok: false, error: toApiError(error, {
+                key: "session_ipc_failure", code: "IOError", severity: "error", args: [],
+            }) };
         }
     } else {
         let response: Response;

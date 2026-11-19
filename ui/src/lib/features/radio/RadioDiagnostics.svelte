@@ -1,13 +1,13 @@
 <script lang="ts">
+    import ConnectionMonitor from "../connection/ConnectionMonitor.svelte";
     import NetworkProbes from "../probes/NetworkProbes.svelte";
     import { onMount } from "svelte";
     import Button from "../../components/ui/Button.svelte";
-    import Icon from "../../components/ui/Icon.svelte";
     import LoadingStatus from "../../components/ui/LoadingStatus.svelte";
-    import SignalBadge from "../../components/ui/SignalBadge.svelte";
+    import RadioResult from "./RadioResult.svelte";
     import Skeleton from "../../components/ui/Skeleton.svelte";
     import Alert from "../../components/ui/Alert.svelte";
-    import { currentLang, t, translateError, type ApiError } from "../../i18n";
+    import { t, translateError, type ApiError } from "../../i18n";
     import { fetchRadioDiagnostic, fetchWifiInterfaces, type Radio, type WifiInterface } from "./radio-api";
 
     let interfaces = $state<WifiInterface[]>([]);
@@ -22,8 +22,6 @@
     let radioError = $state<ApiError | null>(null);
     let listRequest: AbortController | null = null;
     let radioRequest: AbortController | null = null;
-    const formatSeconds = new Intl.NumberFormat(currentLang, { maximumFractionDigits: 2 });
-
     function resetRadio() {
         radioRequest?.abort();
         radioRequest = null;
@@ -57,7 +55,7 @@
         listing = true;
         const request = new AbortController();
         listRequest = request;
-        const result = await fetchWifiInterfaces(request.signal);
+        const result = await fetchWifiInterfaces();
         if (listRequest !== request || request.signal.aborted) return;
         listRequest = null;
         listing = false;
@@ -73,25 +71,6 @@
             ? previous
             : connected.length === 1 ? connected[0].name : "";
         void readRadio(next);
-    }
-
-    function reasonText(reason: string) {
-        switch (reason) {
-            case "hardware_unavailable": return t("radio_ui_hardware_unavailable");
-            case "rssi_unavailable": return t("radio_ui_rssi_unavailable");
-            case "noise_unavailable": return t("radio_ui_noise_unavailable");
-            case "different_sessions": return t("radio_ui_different_sessions");
-            case "time_mismatch": return t("radio_ui_time_mismatch");
-            case "missing_frequency": return t("radio_ui_missing_frequency");
-            case "permission_denied": return t("radio_ui_permission_denied");
-            default: return t("radio_ui_unavailable");
-        }
-    }
-
-    function retryReasonText(reason: string) {
-        const key = `radio_ui_tx_${reason}`;
-        const message = t(key);
-        return message === key ? reasonText(reason) : message;
     }
 
     onMount(() => {
@@ -145,69 +124,17 @@
         {/if}
         {#if reading && !radio}
             <div class="ui-metrics" aria-hidden="true">
-                {#each [1, 2, 3, 4] as metric (metric)}<Skeleton />{/each}
+                {#each [1, 2, 3, 4, 5] as metric (metric)}<Skeleton />{/each}
             </div>
-        {:else if radio?.status === "unavailable"}
-            <p class="ui-muted" role="status"><Icon name="warning" /> {reasonText(radio.reason)}</p>
-        {:else if radio?.status === "available"}
-            <dl class="ui-metrics" aria-live="polite">
-                <div>
-                    <dt>{t("radio_ui_frequency")}</dt>
-                    <dd>{radio.frequency_mhz === null ? t("radio_ui_unavailable") : t("radio_ui_mhz", [String(radio.frequency_mhz)])}</dd>
-                </div>
-                <div>
-                    <dt>{t("radio_ui_quality")}</dt>
-                    <dd><SignalBadge value={radio.signal_quality_percent} missingLabel={t("radio_ui_unavailable")} /></dd>
-                </div>
-                <div>
-                    <dt>RSSI</dt>
-                    <dd>{radio.rssi_dbm == null ? t("radio_ui_unavailable") : `${radio.rssi_dbm} ${t("unit_dbm")}`}</dd>
-                </div>
-                <div>
-                    <dt>SNR</dt>
-                    <dd>{radio.snr.status === "available" ? `${radio.snr.db} ${t("unit_db")}` : reasonText(radio.snr.reason)}</dd>
-                </div>
-            </dl>
-            {#if radio.retries && radio.retries.status !== "not_collected"}
-                <section class="ui-stack ui-subsection" aria-labelledby="radio-tx-heading">
-                    <h3 class="ui-title" id="radio-tx-heading">{t("radio_ui_tx_title")}</h3>
-                    {#if radio.retries.status === "available"}
-                        <dl class="ui-metrics">
-                            <div>
-                                <dt>{t("radio_ui_tx_retries")}</dt>
-                                <dd>{radio.retries.retries_delta ?? t("radio_ui_unavailable")}</dd>
-                            </div>
-                            <div>
-                                <dt>{t("radio_ui_tx_failures")}</dt>
-                                <dd>{radio.retries.failed_delta ?? t("radio_ui_unavailable")}</dd>
-                            </div>
-                            <div>
-                                <dt>{t("radio_ui_tx_interval")}</dt>
-                                <dd>{t("radio_ui_seconds_value", [formatSeconds.format(radio.retries.interval_ns / 1e9)])}</dd>
-                            </div>
-                            {#if radio.retries.retry_rate_percent !== null}
-                                <div>
-                                    <dt>{t("radio_ui_tx_rate")}</dt>
-                                    <dd>{radio.retries.retry_rate_percent}%</dd>
-                                </div>
-                            {/if}
-                        </dl>
-                        {#if radio.retries.attempts_delta === null}
-                            <p class="ui-muted">{t("radio_ui_tx_missing_attempt_counter")}</p>
-                        {/if}
-                    {:else}
-                        <p class="ui-muted" role="status">
-                            <Icon name="warning" /> {retryReasonText(radio.retries.reason)}
-                        </p>
-                    {/if}
-                </section>
-            {/if}
+        {:else if radio}
+            <RadioResult {radio} />
         {/if}
     {:else if !listing && !listError}
         <p class="ui-muted" role="status">{t("radio_ui_no_interfaces")}</p>
     {/if}
     {#if selected}
         {#key selected}
+            <ConnectionMonitor wifiInterface={selected} />
             <NetworkProbes wifiInterface={selected} />
         {/key}
     {/if}

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::measurement::{Measurement, MeasurementState, UnavailableReason};
+use super::measurement::{Measurement, MeasurementState, ObservationTime, UnavailableReason};
 use super::radio_observation::{FrequencyMhz, InterfaceId};
 
 /// Накопительные счётчики времени радиоканала.
@@ -81,6 +81,8 @@ pub struct AirtimeResult {
     pub busy_delta_us: u64,
     pub total_delta_us: u64,
     pub interval_ns: u64,
+    pub started_at: ObservationTime,
+    pub finished_at: ObservationTime,
 }
 
 /// Результат анализа двух снимков.
@@ -176,6 +178,8 @@ pub fn calculate_airtime(
         busy_delta_us: busy_delta,
         total_delta_us: total_delta,
         interval_ns,
+        started_at: previous_time.clone(),
+        finished_at: current_time.clone(),
     })
 }
 
@@ -217,6 +221,8 @@ mod tests {
                 assert_eq!(result.utilization.percent(), 40.0);
                 assert_eq!(result.busy_delta_us, 4_000);
                 assert_eq!(result.total_delta_us, 10_000);
+                assert_eq!(result.started_at, previous.counters.observed_at);
+                assert_eq!(result.finished_at, current.counters.observed_at);
             }
             other => panic!("Unexpected result: {other:?}"),
         }

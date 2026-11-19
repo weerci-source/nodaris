@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Json,
 };
-use nodaris_core::{error::CoreError, keys::diagnostics};
+use nodaris_core::{error::CoreError, input::external_unicast, keys::diagnostics};
 use serde::Deserialize;
 
 use super::radio_api::{error_response, valid_interface_name};
@@ -51,7 +51,7 @@ fn invalid_request() -> Response {
     )
 }
 
-fn local_request(headers: &HeaderMap, port: u16) -> bool {
+pub(super) fn local_request(headers: &HeaderMap, port: u16) -> bool {
     // Vite forwards the local dev origin with the upstream loopback Host.
     let host = headers
         .get(header::HOST)
@@ -74,21 +74,6 @@ fn local_authority(authority: &str, port: u16) -> bool {
         return port == 80 && matches!(authority, "localhost" | "127.0.0.1");
     };
     matches!(host, "localhost" | "127.0.0.1") && port_text.parse() == Ok(port)
-}
-
-fn external_unicast(address: Ipv4Addr) -> bool {
-    !address.is_private()
-        && !address.is_loopback()
-        && !address.is_link_local()
-        && !address.is_documentation()
-        && !matches!(
-            address.octets(),
-            [0 | 224..=255, ..]
-                | [100, 64..=127, ..]
-                | [192, 0, 0, _]
-                | [192, 88, 99, _]
-                | [198, 18 | 19, ..]
-        )
 }
 
 #[cfg(test)]

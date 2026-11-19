@@ -8,19 +8,37 @@ pub(super) struct IwLink {
     pub(super) rssi_dbm: Option<i16>,
 }
 
-pub(super) fn read_link(interface: &str) -> Result<IwLink, UnavailableReason> {
-    parse_link(&command::read_iw(&["dev", interface, "link"])?)
+impl IwLink {
+    pub(super) fn same_context(&self, other: &Self) -> bool {
+        self.bssid.eq_ignore_ascii_case(&other.bssid) && self.frequency_mhz == other.frequency_mhz
+    }
 }
 
-fn parse_link(output: &str) -> Result<IwLink, UnavailableReason> {
+pub(super) enum LinkState {
+    Disconnected,
+    Connected { link: IwLink, ssid: Option<String> },
+}
+
+pub(super) fn read_link(interface: &str) -> Result<IwLink, UnavailableReason> {
+    match read_link_state(interface)? {
+        LinkState::Connected { link, .. } => Ok(link),
+        LinkState::Disconnected => Err(UnavailableReason::NotMeasured),
+    }
+}
+
+pub(super) fn read_link_state(interface: &str) -> Result<LinkState, UnavailableReason> {
+    parse_link_state(&command::read_iw(&["dev", interface, "link"])?)
+}
+
+pub(super) fn parse_link_state(output: &str) -> Result<LinkState, UnavailableReason> {
     let mut lines = output
         .lines()
-        .map(str::trim)
+        .map(str::trim_start)
         .filter(|line| !line.is_empty());
     let header = lines.next().ok_or(UnavailableReason::InvalidMeasurement)?;
 
-    if header == "Not connected." {
-        return Err(UnavailableReason::NotMeasured);
+    if header.trim_end() == "Not connected." {
+        return Ok(LinkState::Disconnected);
     }
 
     let bssid = header
@@ -28,36 +46,22 @@ fn parse_link(output: &str) -> Result<IwLink, UnavailableReason> {
         .and_then(|tail| tail.split_ascii_whitespace().next())
         .ok_or(UnavailableReason::InvalidMeasurement)?;
 
-    let is_mac = bssid.len() == 17
-        && bssid.split(':').count() == 6
-        && bssid
-            .split(':')
-            .all(|octet| octet.len() == 2 && octet.bytes().all(|byte| byte.is_ascii_hexdigit()));
-    if !is_mac {
+    if !valid_bssid(bssid) {
         return Err(UnavailableReason::InvalidMeasurement);
     }
 
+    let mut ssid = None;
     let mut frequency_mhz = None;
     let mut rssi_dbm = None;
 
     for line in lines {
-        if let Some(raw) = line.strip_prefix("freq:") {
-            let raw = raw.trim();
-            let whole_mhz = match raw.split_once('.') {
-                Some((whole, fraction))
-                    if !fraction.is_empty() && fraction.bytes().all(|byte| byte == b'0') =>
-                {
-                    whole
-                }
-                Some(_) => return Err(UnavailableReason::InvalidMeasurement),
-                None => raw,
-            };
-
-            let value = whole_mhz
-                .parse::<u32>()
-                .map_err(|_| UnavailableReason::InvalidMeasurement)?;
-
-            if value == 0 || frequency_mhz.replace(value).is_some() {
+        if let Some(value) = line.strip_prefix("SSID: ") {
+            if ssid.replace(value.to_string()).is_some() {
+                return Err(UnavailableReason::InvalidMeasurement);
+            }
+        } else if let Some(raw) = line.strip_prefix("freq:") {
+            let value = parse_frequency(raw).ok_or(UnavailableReason::InvalidMeasurement)?;
+            if frequency_mhz.replace(value).is_some() {
                 return Err(UnavailableReason::InvalidMeasurement);
             }
         } else if let Some(raw) = line.strip_prefix("signal:") {
@@ -77,11 +81,36 @@ fn parse_link(output: &str) -> Result<IwLink, UnavailableReason> {
         }
     }
 
-    Ok(IwLink {
-        bssid: bssid.to_owned(),
-        frequency_mhz: frequency_mhz.ok_or(UnavailableReason::NotMeasured)?,
-        rssi_dbm,
+    Ok(LinkState::Connected {
+        link: IwLink {
+            bssid: bssid.to_ascii_lowercase(),
+            frequency_mhz: frequency_mhz.ok_or(UnavailableReason::NotMeasured)?,
+            rssi_dbm,
+        },
+        ssid,
     })
+}
+
+pub(super) fn valid_bssid(value: &str) -> bool {
+    value.len() == 17
+        && value.split(':').count() == 6
+        && value
+            .split(':')
+            .all(|octet| octet.len() == 2 && octet.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+pub(super) fn parse_frequency(value: &str) -> Option<u32> {
+    let value = value.trim();
+    let whole = match value.split_once('.') {
+        Some((whole, fraction))
+            if !fraction.is_empty() && fraction.bytes().all(|byte| byte == b'0') =>
+        {
+            whole
+        }
+        Some(_) => return None,
+        None => value,
+    };
+    whole.parse().ok().filter(|&value| value > 0)
 }
 
 #[cfg(test)]
@@ -93,7 +122,10 @@ mod tests {
 
     #[test]
     fn parses_reported_dbm() {
-        let link = parse_link(LINK).unwrap();
+        let LinkState::Connected { link, ssid } = parse_link_state(LINK).unwrap() else {
+            panic!("expected connected")
+        };
+        assert_eq!(ssid.as_deref(), Some("Example"));
         assert_eq!(link.bssid, "aa:bb:cc:dd:ee:ff");
         assert_eq!(link.frequency_mhz, 5260);
         assert_eq!(link.rssi_dbm, Some(-57));
@@ -102,7 +134,7 @@ mod tests {
     #[test]
     fn rejects_non_dbm_signal() {
         assert!(matches!(
-            parse_link(&LINK.replace("-57 dBm", "62 %")),
+            parse_link_state(&LINK.replace("-57 dBm", "62 %")),
             Err(UnavailableReason::InvalidMeasurement)
         ));
     }
@@ -110,15 +142,18 @@ mod tests {
     #[test]
     fn reports_disconnection() {
         assert!(matches!(
-            parse_link("Not connected.\n"),
-            Err(UnavailableReason::NotMeasured)
+            parse_link_state("Not connected.\n"),
+            Ok(LinkState::Disconnected)
         ));
     }
 
     #[test]
     fn parses_frequency_with_zero_fraction() {
         let output = LINK.replace("freq: 5260", "freq: 5260.0");
-        let link = parse_link(&output).expect("valid iw link");
+        let LinkState::Connected { link, .. } = parse_link_state(&output).expect("valid iw link")
+        else {
+            panic!("expected connected")
+        };
 
         assert_eq!(link.frequency_mhz, 5260);
         assert_eq!(link.rssi_dbm, Some(-57));

@@ -1,8 +1,17 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { toApiError, type ApiError } from "../../i18n";
 
 export type WifiInterface = { name: string; connected: boolean };
 type Unavailable = { status: "unavailable"; reason: string };
 type Snr = Unavailable | { status: "available"; db: number };
+type Noise = Unavailable | { status: "available"; dbm: number; source: string };
+type Airtime = Unavailable | { status: "not_collected" } | {
+    status: "available";
+    utilization_percent: number;
+    busy_delta_us: number;
+    total_delta_us: number;
+    interval_ns: number;
+};
 type Retries = Unavailable | { status: "not_collected" } | {
     status: "available";
     retries_delta: number | null;
@@ -16,9 +25,11 @@ type RadioReading = Unavailable | {
     frequency_mhz: number | null;
     signal_quality_percent: number | null;
     rssi_dbm?: number | null;
+    rssi_source?: string | null;
+    noise?: Noise;
     snr: Snr;
 };
-export type Radio = RadioReading & { retries?: Retries };
+export type Radio = RadioReading & { retries?: Retries; airtime?: Airtime };
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
@@ -40,6 +51,22 @@ function isSnr(value: unknown): value is Snr {
         (isRecord(value) && value.status === "available" && isInteger(value.db));
 }
 
+function isNoise(value: unknown): value is Noise {
+    return isUnavailable(value) ||
+        (isRecord(value) && value.status === "available" && isInteger(value.dbm) &&
+            value.dbm < 0 && typeof value.source === "string" && value.source.length > 0);
+}
+
+function isAirtime(value: unknown): value is Airtime {
+    if (isUnavailable(value)) return true;
+    if (!isRecord(value)) return false;
+    if (value.status === "not_collected") return true;
+    const { utilization_percent: percent, busy_delta_us: busy, total_delta_us: total, interval_ns: interval } = value;
+    return value.status === "available" && typeof percent === "number" && percent >= 0 && percent <= 100 &&
+        isInteger(total) && total > 0 && isInteger(busy) && busy >= 0 && busy <= total &&
+        isInteger(interval) && interval > 0;
+}
+
 function isRadio(value: unknown): value is RadioReading {
     if (isUnavailable(value)) return true;
     if (!isRecord(value) || value.status !== "available") return false;
@@ -47,6 +74,8 @@ function isRadio(value: unknown): value is RadioReading {
     return (frequency === null || (isInteger(frequency) && frequency > 0)) &&
         (quality === null || (isInteger(quality) && quality >= 0 && quality <= 100)) &&
         (rssi === undefined || rssi === null || (isInteger(rssi) && rssi < 0)) &&
+        (value.rssi_source == null || typeof value.rssi_source === "string") &&
+        (value.noise === undefined || isNoise(value.noise)) &&
         isSnr(value.snr);
 }
 
@@ -72,7 +101,7 @@ function failure(key: string, code: string): Result<never> {
     return { ok: false, error: { key, code, severity: "error", args: [] } };
 }
 
-async function get<T>(path: string, signal: AbortSignal, decode: (body: unknown) => T | null): Promise<Result<T>> {
+async function get<T>(path: string, signal: AbortSignal | undefined, decode: (body: unknown) => T | null): Promise<Result<T>> {
     let response: Response;
     try {
         response = await fetch(path, { signal, headers: { Accept: "application/json" }, cache: "no-store" });
@@ -101,20 +130,39 @@ async function get<T>(path: string, signal: AbortSignal, decode: (body: unknown)
         : { ok: true, value };
 }
 
-export function fetchWifiInterfaces(signal: AbortSignal): Promise<Result<WifiInterface[]>> {
-    return get("/api/diagnostics/interfaces", signal, (body) => {
-        if (!isRecord(body) || !Array.isArray(body.interfaces)) return null;
-        const items: unknown[] = body.interfaces;
-        if (!items.every(isWifiInterface)) return null;
-        return new Set(items.map((item) => item.name)).size === items.length ? items : null;
-    });
+function decodeInterfaces(items: unknown): WifiInterface[] | null {
+    if (!Array.isArray(items) || !items.every(isWifiInterface)) return null;
+    return new Set(items.map((item) => item.name)).size === items.length ? items : null;
+}
+
+async function readWifiInterfaces(): Promise<Result<WifiInterface[]>> {
+    if (isTauri()) {
+        try {
+            const value = decodeInterfaces(await invoke<unknown>("wifi_interfaces"));
+            return value === null ? failure("radio_ui_invalid_response", "ParseError") : { ok: true, value };
+        } catch (error) {
+            return { ok: false, error: toApiError(error, {key: "session_ipc_failure", code: "IOError", severity: "error", args: []}) };
+        }
+    }
+    return get("/api/diagnostics/interfaces", undefined, (body) =>
+        isRecord(body) ? decodeInterfaces(body.interfaces) : null);
+}
+
+let interfaceRequest: Promise<Result<WifiInterface[]>> | null = null;
+
+export function fetchWifiInterfaces(): Promise<Result<WifiInterface[]>> {
+    interfaceRequest ??= readWifiInterfaces().finally(() => { interfaceRequest = null; });
+    return interfaceRequest;
+}
+
+export function decodeRadio(body: unknown, name: string): Radio | null {
+    if (!isRecord(body) || body.interface !== name || !isRadio(body.radio)) return null;
+    if (body.retries !== undefined && !isRetries(body.retries)) return null;
+    if (body.airtime !== undefined && !isAirtime(body.airtime)) return null;
+    return { ...body.radio, retries: body.retries, airtime: body.airtime };
 }
 
 export function fetchRadioDiagnostic(name: string, signal: AbortSignal): Promise<Result<Radio>> {
     const query = new URLSearchParams({ interface: name });
-    return get(`/api/diagnostics/radio?${query}`, signal, (body) => {
-        if (!isRecord(body) || body.interface !== name || !isRadio(body.radio)) return null;
-        if (body.retries === undefined) return body.radio;
-        return isRetries(body.retries) ? { ...body.radio, retries: body.retries } : null;
-    });
+    return get(`/api/diagnostics/radio?${query}`, signal, (body) => decodeRadio(body, name));
 }

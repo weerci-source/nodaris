@@ -1,5 +1,7 @@
+mod connection_api;
 mod probe_api;
 mod radio_api;
+mod session_api;
 
 use std::net::Ipv4Addr;
 
@@ -10,30 +12,12 @@ use axum::{
     routing::{get, post},
     Extension, Json, Router,
 };
-use serde_json::json;
 use tower_http::services::ServeDir;
 
 async fn scan_handler() -> impl IntoResponse {
     match nodaris_linux::scan_wifi() {
         Ok(aps) => (StatusCode::OK, Json(aps)).into_response(),
-        Err(e) => {
-            // Логируем техническую часть
-            if let Some(tech) = e.technical_message {
-                eprintln!("[Tech Error] {}", tech);
-            }
-
-            // Отдаем структурированную ошибку
-            let err_body = json!({
-                "ok": false,
-                "error": {
-                    "key": e.key,
-                    "code": e.code,
-                    "severity": e.severity,
-                    "args": e.args
-                }
-            });
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(err_body)).into_response()
-        }
+        Err(error) => radio_api::error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
     }
 }
 
@@ -62,6 +46,18 @@ async fn main() {
         .route(
             "/api/diagnostics/probes",
             post(probe_api::probe_handler)
+                .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(1024))
+                .layer(Extension(listen_addr.port())),
+        )
+        .route(
+            "/api/diagnostics/connection",
+            post(connection_api::connection_handler)
+                .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(1024))
+                .layer(Extension(listen_addr.port())),
+        )
+        .route(
+            "/api/diagnostics/session",
+            post(session_api::session_handler)
                 .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(1024))
                 .layer(Extension(listen_addr.port())),
         )

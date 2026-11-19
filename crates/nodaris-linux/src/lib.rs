@@ -1,8 +1,13 @@
+mod connection;
 mod icmp;
 mod radio;
+mod session;
 
+pub use connection::monitor_connection;
 pub use icmp::collect_icmp_report;
 pub use radio::collect_radio_report;
+pub use radio::observe_connection;
+pub use session::{collect_session, try_radio_slot};
 
 use nodaris_core::{error::CoreError, keys, models::access_point::AccessPoint};
 use std::process::Command;

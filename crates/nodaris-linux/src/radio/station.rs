@@ -65,7 +65,7 @@ fn collect_pair(
         Err(reason) => return Err(reason),
     };
 
-    if !same_link_context(initial_link, &current_link) {
+    if !initial_link.same_context(&current_link) {
         return Ok(RetryCalculation::Unavailable(
             RetryUnavailableReason::ConnectionChanged,
         ));
@@ -78,11 +78,6 @@ fn collect_pair(
         &snapshot(interface, previous, previous_time),
         &snapshot(interface, current, current_time),
     ))
-}
-
-fn same_link_context(previous: &IwLink, current: &IwLink) -> bool {
-    previous.bssid.eq_ignore_ascii_case(&current.bssid)
-        && previous.frequency_mhz == current.frequency_mhz
 }
 
 fn match_associations(
@@ -247,6 +242,6 @@ mod tests {
             frequency_mhz: 5280,
             rssi_dbm: None,
         };
-        assert!(!same_link_context(&previous, &current));
+        assert!(!previous.same_context(&current));
     }
 }

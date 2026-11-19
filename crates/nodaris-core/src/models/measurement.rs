@@ -22,6 +22,7 @@ pub enum UnavailableReason {
     NotMeasured,
     InvalidMeasurement,
     TemporarilyUnavailable,
+    ContextChanged,
 }
 
 /// Состояние измерения.

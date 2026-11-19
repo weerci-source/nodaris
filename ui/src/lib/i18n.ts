@@ -18,7 +18,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
         : null;
 }
 
-export function toApiError(value: unknown): ApiError {
+export function toApiError(
+    value: unknown,
+    fallback: ApiError = { key: "scan_unknown_failure", code: "InternalError", severity: "error", args: [] },
+): ApiError {
     const root = asRecord(value);
     const error = root?.ok === false ? asRecord(root.error) : root;
     if (error) {
@@ -36,7 +39,7 @@ export function toApiError(value: unknown): ApiError {
             };
         }
     }
-    return { key: "scan_unknown_failure", code: "InternalError", severity: "error", args: [] };
+    return fallback;
 }
 
 export function t(key: string, args: string[] = []): string {

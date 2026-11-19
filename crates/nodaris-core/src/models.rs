@@ -1,10 +1,12 @@
 pub mod access_point;
 pub mod airtime;
 pub mod connection;
+pub mod connection_timeline;
 pub mod diagnostic_report;
 pub mod icmp;
 pub mod measurement;
 pub mod radio;
 pub mod radio_observation;
 pub mod retries;
+pub mod session;
 pub mod sticky_client;

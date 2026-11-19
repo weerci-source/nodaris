@@ -10,12 +10,19 @@ type Statistics = {
     jitter_ms: number | null;
     packet_loss_percent: number;
 };
+type Attempt = {
+    started_offset_ms: number;
+    finished_offset_ms: number;
+    outcome: { status: "reply"; rtt_ms: number } |
+        { status: "no_reply" | "icmp_error" | "unavailable" };
+};
 type Series = {
     target: string | null;
     route: Route | null;
     started_offset_ms: number;
     finished_offset_ms: number;
     statistics: Statistics | null;
+    attempts?: Attempt[];
     unavailable_reason: string | null;
 };
 export type ProbeReport = {
@@ -46,17 +53,30 @@ function isStatistics(value: unknown): value is Statistics {
             .every((metric) => metric === null || nonnegative(metric));
 }
 
+function isAttempt(value: unknown): value is Attempt {
+    if (!record(value) || !nonnegative(value.started_offset_ms) || !nonnegative(value.finished_offset_ms) ||
+        value.finished_offset_ms < value.started_offset_ms || !record(value.outcome)) return false;
+    switch (value.outcome.status) {
+        case "reply": return nonnegative(value.outcome.rtt_ms);
+        case "no_reply":
+        case "icmp_error":
+        case "unavailable": return true;
+        default: return false;
+    }
+}
+
 function isSeries(value: unknown): value is Series {
     return record(value) && optionalText(value.target) && optionalText(value.unavailable_reason) &&
         nonnegative(value.started_offset_ms) && nonnegative(value.finished_offset_ms) &&
         value.finished_offset_ms >= value.started_offset_ms &&
+        (value.attempts === undefined || (Array.isArray(value.attempts) && value.attempts.every(isAttempt))) &&
         (value.statistics === null || isStatistics(value.statistics)) &&
         (value.route === null || (
             record(value.route) && typeof value.route.interface === "string" && optionalText(value.route.gateway)
         ));
 }
 
-function isReport(value: unknown): value is ProbeReport {
+export function isProbeReport(value: unknown): value is ProbeReport {
     return record(value) && value.method === "icmp" && typeof value.interface === "string" &&
         nonnegative(value.started_at_unix_ms) && value.started_at_unix_ms <= 8.64e15 &&
         isSeries(value.gateway) && isSeries(value.external);
@@ -87,7 +107,7 @@ export async function collectProbes(
         if (!response.ok && record(value) && value.ok === false) {
             return { ok: false, error: toApiError(value) };
         }
-        if (response.ok && isReport(value) && value.interface === wifiInterface && value.external.target === target) {
+        if (response.ok && isProbeReport(value) && value.interface === wifiInterface && value.external.target === target) {
             return { ok: true, report: value };
         }
     } catch {

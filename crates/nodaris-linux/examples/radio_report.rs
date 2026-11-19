@@ -36,7 +36,7 @@ fn main() -> ExitCode {
                 std::process::id()
             )),
         },
-        1_000_000,
+        250_000_000,
     );
 
     println!("Interface: {}", interface.0);
@@ -57,6 +57,7 @@ fn main() -> ExitCode {
                 Some(value) => println!("Signal quality: {}%", value.value()),
                 None => println!("Signal quality: unavailable"),
             }
+            println!("Noise: {:?}", radio.observation.noise);
             println!("SNR: {:?}", radio.snr);
         }
         ReportSection::Unavailable(reason) => {
