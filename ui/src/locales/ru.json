@@ -3,7 +3,7 @@
     "radio_ui_time_mismatch": "Измерения сделаны в слишком разные моменты.",
     "radio_ui_missing_frequency": "Нет данных о частоте для расчёта SNR.",
     "radio_ui_title": "Радиодиагностика",
-    "radio_ui_intro": "Показатели выбранного Wi-Fi-интерфейса. Не влияют на список точек доступа.",
+    "radio_ui_intro": "Показатели выбранного Wi-Fi-интерфейса.",
     "radio_ui_refresh_interfaces": "Обновить список адаптеров",
     "radio_ui_refresh_reading": "Обновить показания",
     "radio_ui_loading_interfaces": "Ищем Wi-Fi-адаптеры…",
@@ -29,9 +29,8 @@
     "scan_interface_down": "Сетевой интерфейс выключен.",
     "scan_unknown_failure": "Не удалось выполнить сканирование сетей.",
     "scan_btn": "Сканировать",
-    "scanning_btn": "Сканируем…",
     "scanning_air": "Запрашиваем список точек доступа…",
-    "no_networks": "Сканер не вернул точек доступа.",
+    "no_networks": "Сети не найдены. Проверьте адаптер.",
     "table_ssid": "SSID",
     "table_bssid": "BSSID (MAC)",
     "table_band": "Диапазон",
@@ -46,7 +45,6 @@
     "unit_db": "дБ",
     "unit_dbm": "дБм",
     "label_no_noise": "Нет данных о шуме",
-    "scan_eyebrow": "Радиосреда",
     "scan_overview": "Обзор Wi-Fi",
     "scan_intro": "Текущая точка подключения и соседние точки доступа.",
     "scan_updated_at": "Обновлено",
@@ -76,5 +74,6 @@
     "scan_invalid_response": "Сканер вернул данные в неожиданном формате.",
     "diagnostics_invalid_interface": "Укажите корректное имя Wi-Fi-интерфейса.",
     "diagnostics_radio_busy": "Радиодиагностика уже выполняется.",
-    "diagnostics_radio_timeout": "Истекло время ожидания радиодиагностики."
+    "diagnostics_radio_timeout": "Истекло время ожидания радиодиагностики.",
+    "radio_ui_previous_results": "Показаны последние полученные показания."
 }

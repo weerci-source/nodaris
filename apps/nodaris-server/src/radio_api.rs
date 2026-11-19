@@ -48,6 +48,7 @@ enum RadioSection {
     Available {
         frequency_mhz: Option<u32>,
         signal_quality_percent: Option<u8>,
+        rssi_dbm: Option<i16>,
         snr: SnrResponse,
     },
 }
@@ -144,6 +145,12 @@ fn encode_radio(interface: String, report: DiagnosticReport) -> RadioResponse {
                 .as_ref()
                 .and_then(|measurement| measurement.value())
                 .map(|value| value.value()),
+            rssi_dbm: radio
+                .observation
+                .rssi
+                .as_ref()
+                .and_then(|measurement| measurement.value())
+                .map(|rssi| rssi.as_dbm()),
             snr: match radio.snr {
                 SnrResult::Available(value) => SnrResponse::Available { db: value.value() },
                 SnrResult::Unavailable(reason) => SnrResponse::Unavailable {
@@ -273,6 +280,7 @@ mod tests {
                     "status": "available",
                     "frequency_mhz": 5260,
                     "signal_quality_percent": null,
+                    "rssi_dbm": null,
                     "snr": {
                         "status": "unavailable",
                         "reason": "rssi_unavailable",

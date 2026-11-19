@@ -7,6 +7,7 @@ export type Radio = Unavailable | {
     status: "available";
     frequency_mhz: number | null;
     signal_quality_percent: number | null;
+    rssi_dbm?: number | null;
     snr: Snr;
 };
 
@@ -33,9 +34,10 @@ function isSnr(value: unknown): value is Snr {
 function isRadio(value: unknown): value is Radio {
     if (isUnavailable(value)) return true;
     if (!isRecord(value) || value.status !== "available") return false;
-    const { frequency_mhz: frequency, signal_quality_percent: quality } = value;
+    const { frequency_mhz: frequency, signal_quality_percent: quality, rssi_dbm: rssi } = value;
     return (frequency === null || (isInteger(frequency) && frequency > 0)) &&
         (quality === null || (isInteger(quality) && quality >= 0 && quality <= 100)) &&
+        (rssi === undefined || rssi === null || (isInteger(rssi) && rssi < 0)) &&
         isSnr(value.snr);
 }
 

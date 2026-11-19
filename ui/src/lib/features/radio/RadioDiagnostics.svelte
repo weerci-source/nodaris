@@ -1,5 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import Button from "../../components/ui/Button.svelte";
+    import Icon from "../../components/ui/Icon.svelte";
+    import LoadingStatus from "../../components/ui/LoadingStatus.svelte";
+    import SignalBadge from "../../components/ui/SignalBadge.svelte";
+    import Skeleton from "../../components/ui/Skeleton.svelte";
     import Alert from "../../components/ui/Alert.svelte";
     import { t, translateError, type ApiError } from "../../i18n";
     import { fetchRadioDiagnostic, fetchWifiInterfaces, type Radio, type WifiInterface } from "./radio-api";
@@ -9,6 +14,9 @@
     let radio = $state<Radio | null>(null);
     let listing = $state(true);
     let reading = $state(false);
+    let loadingMessage = $derived(listing
+        ? t("radio_ui_loading_interfaces")
+        : reading ? t("radio_ui_loading_reading") : "");
     let listError = $state<ApiError | null>(null);
     let radioError = $state<ApiError | null>(null);
     let listRequest: AbortController | null = null;
@@ -23,7 +31,9 @@
     }
 
     async function readRadio(name: string) {
-        resetRadio();
+        if (name !== selected) resetRadio();
+        else radioRequest?.abort();
+        radioError = null;
         selected = name;
         if (!name) return;
 
@@ -40,9 +50,7 @@
 
     async function refreshInterfaces() {
         listRequest?.abort();
-        resetRadio();
         const previous = selected;
-        selected = "";
         listError = null;
         listing = true;
         const request = new AbortController();
@@ -54,7 +62,6 @@
 
         if (!result.ok) {
             listError = result.error;
-            interfaces = [];
             return;
         }
 
@@ -63,7 +70,7 @@
         const next = interfaces.some((item) => item.name === previous)
             ? previous
             : connected.length === 1 ? connected[0].name : "";
-        if (next) void readRadio(next);
+        void readRadio(next);
     }
 
     function reasonText(reason: string) {
@@ -88,54 +95,65 @@
     });
 </script>
 
-<section class="card diagnostics" aria-labelledby="radio-heading">
-    <div class="heading">
+<section class="card ui-stack ui-section" aria-labelledby="radio-heading">
+    <header class="ui-row ui-row-between">
         <div>
-            <h2 id="radio-heading">{t("radio_ui_title")}</h2>
-            <p>{t("radio_ui_intro")}</p>
+            <h2 id="radio-heading" class="ui-title">{t("radio_ui_title")}</h2>
+            <p class="ui-muted">{t("radio_ui_intro")}</p>
         </div>
-        <button type="button" class="btn secondary" disabled={listing || reading} onclick={refreshInterfaces}>
+        <Button variant="secondary" icon="refresh" loading={listing} disabled={reading} onclick={refreshInterfaces}>
             {t("radio_ui_refresh_interfaces")}
-        </button>
-    </div>
+        </Button>
+    </header>
+
+    <LoadingStatus message={loadingMessage} />
 
     {#if listError}
         <Alert severity={listError.severity}>{translateError(listError)}</Alert>
-    {:else if listing}
-        <p role="status">{t("radio_ui_loading_interfaces")}</p>
-    {:else if interfaces.length === 0}
-        <p role="status">{t("radio_ui_no_interfaces")}</p>
-    {:else}
-        <div class="toolbar">
-            <label>
+    {/if}
+
+    {#if interfaces.length}
+        <div class="ui-row">
+            <label class="ui-field">
                 <span>{t("radio_ui_interface")}</span>
-                <select value={selected} onchange={(event) => void readRadio(event.currentTarget.value)}>
+                <select class="ui-control" value={selected} disabled={listing}
+                    onchange={(event) => void readRadio(event.currentTarget.value)}>
                     <option value="">{t("radio_ui_choose")}</option>
                     {#each interfaces as item (item.name)}
                         <option value={item.name}>{item.name} — {t(item.connected ? "radio_ui_connected" : "radio_ui_disconnected")}</option>
                     {/each}
                 </select>
             </label>
-            <button type="button" class="btn secondary" disabled={!selected || reading} onclick={() => void readRadio(selected)}>
+            <Button variant="secondary" icon="refresh" loading={reading} disabled={!selected || listing} onclick={() => void readRadio(selected)}>
                 {t("radio_ui_refresh_reading")}
-            </button>
+            </Button>
         </div>
 
         {#if radioError}
             <Alert severity={radioError.severity}>{translateError(radioError)}</Alert>
-        {:else if reading}
-            <p role="status">{t("radio_ui_loading_reading")}</p>
+        {/if}
+        {#if (radioError || listError) && radio?.status === "available"}
+            <p class="ui-muted">{t("radio_ui_previous_results")}</p>
+        {/if}
+        {#if reading && !radio}
+            <div class="ui-metrics" aria-hidden="true">
+                {#each [1, 2, 3, 4] as metric (metric)}<Skeleton />{/each}
+            </div>
         {:else if radio?.status === "unavailable"}
-            <p role="status">{reasonText(radio.reason)}</p>
+            <p class="ui-muted" role="status"><Icon name="warning" /> {reasonText(radio.reason)}</p>
         {:else if radio?.status === "available"}
-            <dl aria-live="polite">
+            <dl class="ui-metrics" aria-live="polite">
                 <div>
                     <dt>{t("radio_ui_frequency")}</dt>
                     <dd>{radio.frequency_mhz === null ? t("radio_ui_unavailable") : t("radio_ui_mhz", [String(radio.frequency_mhz)])}</dd>
                 </div>
                 <div>
                     <dt>{t("radio_ui_quality")}</dt>
-                    <dd>{radio.signal_quality_percent === null ? t("radio_ui_unavailable") : `${radio.signal_quality_percent}%`}</dd>
+                    <dd><SignalBadge value={radio.signal_quality_percent} missingLabel={t("radio_ui_unavailable")} /></dd>
+                </div>
+                <div>
+                    <dt>RSSI</dt>
+                    <dd>{radio.rssi_dbm == null ? t("radio_ui_unavailable") : `${radio.rssi_dbm} ${t("unit_dbm")}`}</dd>
                 </div>
                 <div>
                     <dt>SNR</dt>
@@ -143,24 +161,7 @@
                 </div>
             </dl>
         {/if}
+    {:else if !listing && !listError}
+        <p class="ui-muted" role="status">{t("radio_ui_no_interfaces")}</p>
     {/if}
 </section>
-
-<style>
-    .diagnostics { margin-block-start: var(--space-4); }
-    .heading, .toolbar { display: flex; align-items: end; flex-wrap: wrap; column-gap: var(--space-3); row-gap: var(--space-2); }
-    .heading { align-items: start; justify-content: space-between; }
-    .toolbar { margin-block-start: var(--space-3); }
-    h2 { margin: 0; font-size: 1.2rem; }
-    p { margin-block: var(--space-2) 0; color: var(--color-text-muted); }
-    p[role="status"], .heading:has(+ :global(.alert)), .toolbar:has(+ :global(.alert)) { margin-block-end: var(--space-2); }
-    label { display: grid; gap: var(--space-1); color: var(--color-text-muted); }
-    select, .secondary { min-height: 2.5rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-    select { color: var(--color-text); background: var(--color-bg); padding-inline: var(--space-2); max-width: 100%; }
-    .secondary { color: var(--color-text); background: var(--color-bg); padding-inline: var(--space-3); }
-    .secondary:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-raised); }
-    .secondary:disabled { cursor: default; }
-    dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: var(--space-3); margin-block: var(--space-3) 0; }
-    dt { color: var(--color-text-muted); }
-    dd { margin: var(--space-1) 0 0; }
-</style>

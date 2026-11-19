@@ -3,7 +3,7 @@
     "radio_ui_time_mismatch": "The readings were taken too far apart.",
     "radio_ui_missing_frequency": "Frequency is missing for the SNR calculation.",
     "radio_ui_title": "Radio diagnostics",
-    "radio_ui_intro": "Measurements for the selected Wi-Fi interface. These do not affect the access point list.",
+    "radio_ui_intro": "Measurements for the selected Wi-Fi interface.",
     "radio_ui_refresh_interfaces": "Refresh adapters",
     "radio_ui_refresh_reading": "Refresh readings",
     "radio_ui_loading_interfaces": "Looking for Wi-Fi adapters…",
@@ -29,9 +29,8 @@
     "scan_interface_down": "Network interface is down.",
     "scan_unknown_failure": "Failed to scan networks.",
     "scan_btn": "Scan",
-    "scanning_btn": "Scanning…",
     "scanning_air": "Reading access points…",
-    "no_networks": "The scan returned no access points.",
+    "no_networks": "No networks found. Check the adapter.",
     "table_ssid": "SSID",
     "table_bssid": "BSSID (MAC)",
     "table_band": "Band",
@@ -46,7 +45,6 @@
     "unit_db": "dB",
     "unit_dbm": "dBm",
     "label_no_noise": "No noise data",
-    "scan_eyebrow": "Radio environment",
     "scan_overview": "Wi-Fi overview",
     "scan_intro": "Your current connection and nearby access points.",
     "scan_updated_at": "Updated",
@@ -76,5 +74,6 @@
     "scan_invalid_response": "The scanner returned an unexpected data format.",
     "diagnostics_invalid_interface": "Specify a valid Wi-Fi interface name.",
     "diagnostics_radio_busy": "Radio diagnostics are already running.",
-    "diagnostics_radio_timeout": "Radio diagnostics timed out."
+    "diagnostics_radio_timeout": "Radio diagnostics timed out.",
+    "radio_ui_previous_results": "Showing the last received readings."
 }

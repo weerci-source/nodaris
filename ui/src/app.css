@@ -1,43 +1,43 @@
 :root {
     color-scheme: dark;
-    /* Цвета из логотипа Nodaris */
-    --color-bg: #060b19;       /* Глубокий темно-синий */
-    --color-surface-raised: #152137;
-    --color-surface: #0f172a;  /* Чуть светлее для карточек */
-    --color-primary: #00b4d8;  /* Яркий голубой (свечение) */
-    --color-primary-hover: #0077b6;
-    --color-text: #e2e8f0;     /* Светло-серый текст */
-    --color-text-muted: #94a3b8;
-    --color-border: #1e293b;
+    --color-bg: #0d1117;
+    --color-surface: #161b22;
+    --color-surface-raised: #212933;
+    --color-primary: #00d2ff;
+    --color-primary-hover: #6ee7ff;
     --color-on-primary: var(--color-bg);
-    --color-on-primary-hover: var(--color-text);
-    
-    /* Семантические цвета */
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-danger: #ef4444;
+    --color-text: #c9d1d9;
+    --color-text-muted: #a3aebc;
+    --color-border: #303b48;
+    --color-skeleton: #354150;
+    --color-success: #56d39b;
+    --color-warning: #f5bd50;
+    --color-danger: #f85149;
 
-    /* Spacing scale (4px) */
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 16px;
     --space-4: 24px;
     --space-5: 32px;
 
-    /* Типографика */
     --font-family: 'Inter', system-ui, -apple-system, sans-serif;
     --radius-md: 8px;
+    --control-height: 2.5rem;
+    --control-height-sm: 2rem;
 }
 
 body {
-    background-color: var(--color-bg);
+    background: var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-family);
     margin: 0;
-    padding: 0;
-    min-height: 100vh;
+}
+
+#app {
     display: flex;
     flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
 }
 
 /* Canonical utilities */
@@ -48,25 +48,10 @@ body {
     padding: var(--space-4);
 }
 
-.btn {
-    background: var(--color-primary);
-    color: var(--color-on-primary);
-    border: none;
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.btn:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-    color: var(--color-on-primary-hover);
-}
-
 .table-scroll {
-    overflow-x: auto;
-    min-height: 0;
+    min-block-size: 0;
+    min-inline-size: 0;
+    overflow: auto;
 }
 
 table {
@@ -76,7 +61,7 @@ table {
 
 th, td {
     padding: var(--space-2) var(--space-3);
-    text-align: left;
+    text-align: start;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -88,5 +73,63 @@ th {
 
 button, input, select { font: inherit; }
 *, *::before, *::after { box-sizing: border-box; }
-:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
-.btn:disabled { opacity: .7; cursor: wait; }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: var(--space-1); }
+
+/* Shared layout and form utilities */
+.ui-section { margin-block-start: var(--space-4); }
+
+.ui-stack {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.ui-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--space-2) var(--space-3);
+}
+
+.ui-row-between {
+    align-items: start;
+    justify-content: space-between;
+}
+
+.ui-title { margin: 0; }
+
+.ui-muted {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.ui-title + .ui-muted { margin-block-start: var(--space-2); }
+
+.ui-field {
+    display: grid;
+    min-inline-size: 0;
+    gap: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: .875rem;
+}
+
+.ui-control {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    min-block-size: var(--control-height);
+    font-size: 1rem;
+    padding: var(--space-2);
+    color: var(--color-text);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.ui-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: var(--space-3);
+    margin: 0;
+}
+
+.ui-metrics dt { color: var(--color-text-muted); }
+.ui-metrics dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }

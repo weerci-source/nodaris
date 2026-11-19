@@ -6,7 +6,10 @@
         "**/.vscode",
         "**/*.svg",
         "**/*.png",
-        "**/tests"
+        "**/tests",
+        "**/.gitignore",
+        "**/package*",
+        "**/*.md",
     ],
     "files.watcherExclude": {
         "**/target/**": true,
