@@ -1,5 +1,7 @@
 <script lang="ts">
     import Scanner from "./lib/features/scanner/Scanner.svelte";
+    import { isTauri } from "@tauri-apps/api/core";
+    import RadioDiagnostics from "./lib/features/radio/RadioDiagnostics.svelte";
     import { t } from "./lib/i18n";
 </script>
 
@@ -18,6 +20,9 @@
 
 <main class="frame">
     <Scanner />
+    {#if !isTauri()}
+        <RadioDiagnostics />
+    {/if}
 </main>
 
 <style>
