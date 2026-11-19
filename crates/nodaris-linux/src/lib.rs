@@ -1,3 +1,7 @@
+mod radio;
+
+pub use radio::collect_radio_report;
+
 use nodaris_core::{error::CoreError, keys, models::access_point::AccessPoint};
 use std::process::Command;
 

@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use nodaris_core::error::CoreError;
-use nodaris_core::models::AccessPoint;
+use nodaris_core::models::access_point::AccessPoint;
 
 // Команда, которую мы будем вызывать из Svelte
 #[tauri::command]
