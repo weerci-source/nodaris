@@ -8,3 +8,9 @@ pub mod scan {
     pub const INTERFACE_DOWN: &str = "scan_interface_down";
     pub const UNKNOWN_FAILURE: &str = "scan_unknown_failure";
 }
+
+pub mod diagnostics {
+    pub const INVALID_INTERFACE: &str = "diagnostics_invalid_interface";
+    pub const RADIO_BUSY: &str = "diagnostics_radio_busy";
+    pub const RADIO_TIMEOUT: &str = "diagnostics_radio_timeout";
+}

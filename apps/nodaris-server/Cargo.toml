@@ -9,7 +9,7 @@ nodaris-linux = { path = "../../crates/nodaris-linux" }
 
 # Веб-сервер
 axum = "0.8.9"
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
 
 # Сериализация
 serde = { workspace = true }

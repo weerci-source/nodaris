@@ -49,5 +49,8 @@
     "scan_hidden_ssid": "SSID unavailable",
     "scan_previous_results": "Showing the last successful scan.",
     "scan_transport_failure": "The scan server is unavailable.",
-    "scan_invalid_response": "The scanner returned an unexpected data format."
+    "scan_invalid_response": "The scanner returned an unexpected data format.",
+    "diagnostics_invalid_interface": "Specify a valid Wi-Fi interface name.",
+    "diagnostics_radio_busy": "Radio diagnostics are already running.",
+    "diagnostics_radio_timeout": "Radio diagnostics timed out."
 }

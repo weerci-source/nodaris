@@ -49,5 +49,8 @@
     "scan_hidden_ssid": "SSID не указан",
     "scan_previous_results": "Показан последний успешный результат.",
     "scan_transport_failure": "Сервер сканирования недоступен.",
-    "scan_invalid_response": "Сканер вернул данные в неожиданном формате."
+    "scan_invalid_response": "Сканер вернул данные в неожиданном формате.",
+    "diagnostics_invalid_interface": "Укажите корректное имя Wi-Fi-интерфейса.",
+    "diagnostics_radio_busy": "Радиодиагностика уже выполняется.",
+    "diagnostics_radio_timeout": "Истекло время ожидания радиодиагностики."
 }
