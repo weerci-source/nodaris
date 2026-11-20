@@ -6,6 +6,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::scan_wifi,
             commands::wifi_interfaces,
+            commands::observe_airtime,
             commands::diagnostic_session,
             commands::ethernet_interfaces,
             commands::ethernet_diagnostics,

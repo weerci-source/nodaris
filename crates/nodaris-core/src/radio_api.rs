@@ -19,7 +19,7 @@ pub struct RadioResponse {
 
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
-enum AirtimeSection {
+pub enum AirtimeSection {
     NotCollected,
     Unavailable {
         reason: &'static str,
@@ -32,6 +32,23 @@ enum AirtimeSection {
         started_at: ObservationTime,
         finished_at: ObservationTime,
     },
+}
+
+#[derive(Serialize)]
+pub struct AirtimeSample {
+    pub elapsed_ns: u64,
+    pub reading: AirtimeSection,
+}
+
+#[derive(Serialize)]
+pub struct AirtimeSeries {
+    pub interface: String,
+    pub frequency_mhz: Option<u32>,
+    pub source: &'static str,
+    pub started_at: ObservationTime,
+    pub finished_at: ObservationTime,
+    pub samples: Vec<AirtimeSample>,
+    pub stopped_reason: Option<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -149,7 +166,7 @@ fn encode_noise(noise: Option<Measurement<NoiseDbm>>) -> NoiseResponse {
     }
 }
 
-fn encode_airtime(airtime: ReportSection<AirtimeCalculation>) -> AirtimeSection {
+pub fn encode_airtime(airtime: ReportSection<AirtimeCalculation>) -> AirtimeSection {
     use AirtimeUnavailableReason as Reason;
     match airtime {
         ReportSection::NotCollected => AirtimeSection::NotCollected,
@@ -231,7 +248,7 @@ fn encode_retries(retries: ReportSection<RetryCalculation>) -> RetrySection {
     }
 }
 
-fn collection_reason(reason: UnavailableReason) -> &'static str {
+pub fn collection_reason(reason: UnavailableReason) -> &'static str {
     match reason {
         UnavailableReason::NotSupported => "not_supported",
         UnavailableReason::PermissionDenied => "permission_denied",

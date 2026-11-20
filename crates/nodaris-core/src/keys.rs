@@ -1,4 +1,7 @@
 pub mod transport {
+    pub const AIRTIME_HTTP_FAILURE: &str = "airtime_http_failure";
+    pub const AIRTIME_IPC_FAILURE: &str = "airtime_ipc_failure";
+    pub const AIRTIME_INVALID_RESPONSE: &str = "airtime_invalid_response";
     pub const HISTORY_HTTP_FAILURE: &str = "history_http_failure";
     pub const HISTORY_IPC_FAILURE: &str = "history_ipc_failure";
     pub const HISTORY_INVALID_RESPONSE: &str = "history_invalid_response";
@@ -15,6 +18,7 @@ pub mod settings {
 }
 
 pub mod history {
+    pub const EMPTY: &str = "history_empty";
     pub const READ_FAILED: &str = "history_read_failed";
     pub const SAVE_FAILED: &str = "history_save_failed";
     pub const DELETE_FAILED: &str = "history_delete_failed";
@@ -35,6 +39,9 @@ pub mod scan {
 }
 
 pub mod diagnostics {
+    pub const AIRTIME_FORBIDDEN: &str = "diagnostics_airtime_forbidden";
+    pub const AIRTIME_INVALID_REQUEST: &str = "diagnostics_airtime_invalid_request";
+    pub const AIRTIME_UNSUPPORTED: &str = "diagnostics_airtime_unsupported";
     pub const INVALID_INTERFACE: &str = "diagnostics_invalid_interface";
     pub const RADIO_BUSY: &str = "diagnostics_radio_busy";
     pub const RADIO_TIMEOUT: &str = "diagnostics_radio_timeout";

@@ -12,6 +12,16 @@ type Airtime = Unavailable | { status: "not_collected" } | {
     total_delta_us: number;
     interval_ns: number;
 };
+export type AirtimeSample = { elapsed_ns: number; reading: Exclude<Airtime, { status: "not_collected" }> };
+export type AirtimeSeries = {
+    interface: string;
+    frequency_mhz: number | null;
+    source: string;
+    started_at: { monotonic_time_ns: number };
+    finished_at: { monotonic_time_ns: number };
+    samples: AirtimeSample[];
+    stopped_reason: string | null;
+};
 type Retries = Unavailable | { status: "not_collected" } | {
     status: "available";
     retries_delta: number | null;
@@ -165,4 +175,55 @@ export function decodeRadio(body: unknown, name: string): Radio | null {
 export function fetchRadioDiagnostic(name: string, signal: AbortSignal): Promise<Result<Radio>> {
     const query = new URLSearchParams({ interface: name });
     return get(`/api/diagnostics/radio?${query}`, signal, (body) => decodeRadio(body, name));
+}
+
+function isObservation(value: unknown): value is AirtimeSeries["started_at"] {
+    return isRecord(value) && isInteger(value.monotonic_time_ns) && value.monotonic_time_ns >= 0;
+}
+
+function isAirtimeSample(value: unknown): value is AirtimeSample {
+    return isRecord(value) && isInteger(value.elapsed_ns) && value.elapsed_ns >= 0 &&
+        isAirtime(value.reading) && value.reading.status !== "not_collected";
+}
+
+function isAirtimeSeries(value: unknown, name: string): value is AirtimeSeries {
+    if (!isRecord(value) || value.interface !== name || typeof value.source !== "string" ||
+        (value.frequency_mhz !== null && (!isInteger(value.frequency_mhz) || value.frequency_mhz <= 0)) ||
+        (value.stopped_reason !== null && typeof value.stopped_reason !== "string") ||
+        !isObservation(value.started_at) || !isObservation(value.finished_at) || !Array.isArray(value.samples) ||
+        !value.samples.every(isAirtimeSample)) return false;
+    const duration = value.finished_at.monotonic_time_ns - value.started_at.monotonic_time_ns;
+    return duration >= 0 && value.samples.every((sample, index, samples) =>
+        sample.elapsed_ns <= duration && (index === 0 || sample.elapsed_ns > samples[index - 1].elapsed_ns));
+}
+
+export async function observeAirtime(name: string, signal: AbortSignal): Promise<Result<AirtimeSeries>> {
+    const invalid: ApiError = { key: "airtime_invalid_response", code: "ParseError", severity: "error", args: [] };
+    let body: unknown;
+    if (isTauri()) {
+        try {
+            body = await invoke("observe_airtime", { interface: name });
+        } catch (cause) {
+            return { ok: false, error: toApiError(cause, { key: "airtime_ipc_failure", code: "IOError", severity: "error", args: [] }) };
+        }
+    } else {
+        let response: Response;
+        try {
+            response = await fetch("/api/diagnostics/airtime", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ interface: name }),
+                signal,
+            });
+        } catch {
+            return failure("airtime_http_failure", "NetworkError");
+        }
+        try {
+            body = await response.json();
+        } catch {
+            return { ok: false, error: invalid };
+        }
+        if (!response.ok) return { ok: false, error: toApiError(body, invalid) };
+    }
+    return isAirtimeSeries(body, name) ? { ok: true, value: body } : { ok: false, error: invalid };
 }

@@ -86,7 +86,18 @@ pub(super) fn collect(
 }
 
 fn source() -> SourceId {
-    SourceId("linux.iw.survey".into())
+    SourceId(SOURCE.into())
+}
+
+pub(super) const SOURCE: &str = "linux.iw.survey";
+
+pub(super) fn read_counters(
+    interface: &InterfaceId,
+    link: &IwLink,
+    read_time: impl FnOnce() -> ObservationTime,
+) -> Result<ChannelSurveySnapshot, UnavailableReason> {
+    let counters = read(interface, link.frequency_mhz)?.counters?;
+    Ok(snapshot(interface, link, counters, read_time()))
 }
 
 fn snapshot(

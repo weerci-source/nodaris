@@ -1,6 +1,6 @@
 <script module lang="ts">
     export type IconName = "wifi" | "refresh" | "loading" | "check" | "info" | "warning" | "error"
-        | "chevron-right" | "chevron-down" | "session" | "ethernet" | "history" | "settings" | "sun" | "moon" | "monitor";
+        | "chevron-right" | "chevron-down" | "chevron-left" | "more" | "session" | "ethernet" | "history" | "settings" | "sun" | "moon" | "monitor" | "search" | "close";
 </script>
 
 <script lang="ts">
@@ -15,10 +15,19 @@
         <path d="M20 5v5h-5m5 0a8 8 0 1 0-.8 6" />
     {:else if name === "loading"}
         <path d="M12 4a8 8 0 1 1-8 8" />
+    {:else if name === "search"}
+        <circle cx="10.5" cy="10.5" r="5.5" />
+        <path d="m15 15 4 4" />
+    {:else if name === "close"}
+        <path d="m6 6 12 12M18 6 6 18" />
     {:else if name === "check"}
         <path d="m5 12 4 4L19 6" />
     {:else if name === "chevron-right"}
         <path d="m10 6 6 6-6 6" />
+    {:else if name === "chevron-left"}
+        <path d="m14 6-6 6 6 6" />
+    {:else if name === "more"}
+        <path d="M5 12h.01m6.99 0h.01m6.99 0h.01" stroke-width="3" />
     {:else if name === "chevron-down"}
         <path d="m6 10 6 6 6-6" />
     {:else if name === "session"}

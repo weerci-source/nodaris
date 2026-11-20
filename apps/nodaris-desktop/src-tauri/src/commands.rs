@@ -6,6 +6,7 @@ use nodaris_core::{
         history::{HistoryEntry, RecordedReport},
         session::DiagnosticSession,
     },
+    radio_api::AirtimeSeries,
 };
 use serde::Serialize;
 
@@ -17,6 +18,24 @@ pub(super) async fn scan_wifi() -> Result<Vec<AccessPoint>, ApiError> {
     }
     #[cfg(not(target_os = "linux"))]
     Err(unsupported())
+}
+
+#[tauri::command]
+pub(super) async fn observe_airtime(interface: String) -> Result<AirtimeSeries, ApiError> {
+    #[cfg(target_os = "linux")]
+    {
+        nodaris_linux::observe_airtime(interface)
+            .await
+            .map_err(CoreError::into_api)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = interface;
+        Err(
+            CoreError::hardware_err(nodaris_core::keys::diagnostics::AIRTIME_UNSUPPORTED)
+                .into_api(),
+        )
+    }
 }
 
 #[tauri::command]

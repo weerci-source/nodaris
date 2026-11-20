@@ -23,17 +23,20 @@ function load(): Preferences {
 
 const state = $state(load());
 const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+let resolvedTheme = $state<"light" | "dark">("dark");
 
 export const appearance = {
     get language() { return state.language; },
     get theme() { return state.theme; },
+    get resolvedTheme() { return resolvedTheme; },
 };
 
 function apply() {
     document.documentElement.lang = state.language;
-    document.documentElement.dataset.theme = state.theme === "system"
+    resolvedTheme = state.theme === "system"
         ? (systemTheme.matches ? "dark" : "light")
         : state.theme;
+    document.documentElement.dataset.theme = resolvedTheme;
 }
 
 export function initializeAppearance() {

@@ -9,7 +9,7 @@ pub use connection::monitor_connection;
 pub use ethernet::{collect_ethernet_report, list_ethernet_links};
 pub use icmp::collect_icmp_report;
 pub use radio::collect_radio_report;
-pub use radio::observe_connection;
+pub use radio::{observe_airtime, observe_connection};
 pub use session::{collect_session, try_radio_slot};
 
 use nodaris_core::{error::CoreError, keys, models::access_point::AccessPoint};

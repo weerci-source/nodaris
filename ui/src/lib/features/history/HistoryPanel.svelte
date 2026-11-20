@@ -17,7 +17,8 @@
     let entries = $state.raw<HistoryEntry[] | null>(null);
     let selectedId = $state("");
     let selected = $derived(entries?.find((entry) => entry.id === selectedId));
-    let compact = $state(window.matchMedia("(max-width: 760px)").matches);
+    const narrow = window.matchMedia("(max-width: 760px)");
+    let compact = $state(narrow.matches);
     let detailOpen = $state(false);
     let actionsOpen = $state(false);
     let confirming = $state(false);
@@ -27,8 +28,8 @@
     let actionError = $state<ApiError | null>(null);
     let deleted = $state(false);
     let heading: HTMLHeadingElement;
-    let detail: HTMLElement;
-    let actions: HTMLDivElement;
+    let detail = $state<HTMLElement>();
+    let actions = $state<HTMLDivElement>();
     let active: AbortController | null = null;
     let refreshPending = false;
 
@@ -38,7 +39,8 @@
             selectedId = next[0]?.id ?? "";
             confirming = false;
             actionsOpen = false;
-            if (!selectedId) detailOpen = false;
+            actionError = null;
+            detailOpen = false;
         }
     }
 
@@ -53,7 +55,10 @@
         confirming = false;
         actionError = null;
         deleted = false;
-        if (compact) void tick().then(() => focus("report-title"));
+        if (compact) void tick().then(() => {
+            detail?.scrollIntoView({ block: "start" });
+            focus("report-title");
+        });
     }
 
     function back() {
@@ -65,7 +70,7 @@
     }
 
     function handleActions(event: MouseEvent) {
-        if (actionsOpen && event.target instanceof Node && !actions.contains(event.target)) {
+        if (actionsOpen && event.target instanceof Node && !actions?.contains(event.target)) {
             actionsOpen = false;
         }
     }
@@ -137,7 +142,6 @@
             loadError = null;
             confirming = false;
             deleted = true;
-            if (compact) detailOpen = false;
         } else {
             actionError = result.error;
         }
@@ -172,13 +176,12 @@
     }
 
     onMount(() => {
-        const query = window.matchMedia("(max-width: 760px)");
-        const update = () => { compact = query.matches; };
-        query.addEventListener("change", update);
+        const update = () => { compact = narrow.matches; };
+        narrow.addEventListener("change", update);
         void refresh();
         return () => {
             active?.abort();
-            query.removeEventListener("change", update);
+            narrow.removeEventListener("change", update);
         };
     });
 </script>
@@ -211,7 +214,7 @@
     {#if entries?.length && selected}
         <div class="history-layout" class:compact>
             <ul class="history-list" aria-label={t("history_reports")} hidden={compact && detailOpen}>
-                    {#each entries as entry (entry.id)}
+                {#each entries as entry (entry.id)}
                     <li>
                         <button type="button" class="history-entry" disabled={deleting}
                             id={`${id}-entry-${entry.id}`} aria-current={selectedId === entry.id ? "true" : undefined}
@@ -219,11 +222,11 @@
                             <span class="history-entry-icon"><Icon name={entry.kind === "session" ? "session" : "ethernet"} /></span>
                             <span class="history-entry-text">
                                 <strong>{reportInterface(entry)}</strong>
-                                <span>{reportTime(entry)}</span>
+                                <span>{t(entry.kind === "session" ? "workspace_session" : "ethernet_title")} · {reportTime(entry)}</span>
                             </span>
                         </button>
                     </li>
-                    {/each}
+                {/each}
             </ul>
             <article class="card ui-stack history-detail" id={`${id}-report`} aria-labelledby={`${id}-report-title`}
                 bind:this={detail} hidden={compact && !detailOpen}>

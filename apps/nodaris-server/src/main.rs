@@ -1,3 +1,4 @@
+mod airtime_api;
 mod connection_api;
 mod ethernet_api;
 mod history_api;
@@ -75,6 +76,12 @@ async fn main() {
                 .layer(Extension(listen_addr.port())),
         )
         .route("/api/diagnostics/radio", get(radio_api::radio_handler))
+        .route(
+            "/api/diagnostics/airtime",
+            post(airtime_api::observe)
+                .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(1024))
+                .layer(Extension(listen_addr.port())),
+        )
         .route(
             "/api/diagnostics/interfaces",
             get(radio_api::interfaces_handler),
