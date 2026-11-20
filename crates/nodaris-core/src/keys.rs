@@ -58,6 +58,7 @@ pub mod diagnostics {
     pub const ETHERNET_FORBIDDEN: &str = "diagnostics_ethernet_forbidden";
     pub const ETHERNET_INVALID_REQUEST: &str = "diagnostics_ethernet_invalid_request";
     pub const ETHERNET_INVALID_TARGET: &str = "diagnostics_ethernet_invalid_target";
+    pub const ETHERNET_TARGET_UNRESOLVED: &str = "diagnostics_ethernet_target_unresolved";
     pub const ETHERNET_INTERFACE_UNAVAILABLE: &str = "diagnostics_ethernet_interface_unavailable";
     pub const ETHERNET_READ_FAILED: &str = "diagnostics_ethernet_read_failed";
     pub const ETHERNET_UNSUPPORTED: &str = "diagnostics_ethernet_unsupported";

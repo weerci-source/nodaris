@@ -1,8 +1,9 @@
 use std::{
     fs,
     io::{self, ErrorKind},
-    net::Ipv4Addr,
+    net::{IpAddr, Ipv4Addr},
     path::Path,
+    time::Duration,
 };
 
 use nodaris_core::{
@@ -20,6 +21,7 @@ use crate::{collect_icmp_report, session::RunClock};
 const SYSFS_NET: &str = "/sys/class/net";
 const ARPHRD_ETHER: &str = "1";
 const IFF_UP: u32 = 0x1;
+const DNS_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub fn list_ethernet_links() -> Result<Vec<EthernetLink>, CoreError> {
     read_links(Path::new(SYSFS_NET)).map_err(read_error)
@@ -34,11 +36,7 @@ pub async fn collect_ethernet_report(
             diagnostics::ETHERNET_INTERFACE_UNAVAILABLE,
         ));
     }
-    let target = target
-        .parse::<Ipv4Addr>()
-        .ok()
-        .filter(|address| external_unicast(*address))
-        .ok_or_else(|| CoreError::validation(diagnostics::ETHERNET_INVALID_TARGET))?;
+    let (address, hostname) = resolve_target(target).await?;
 
     let link = tokio::task::spawn_blocking(move || {
         let path = Path::new(SYSFS_NET).join(&interface);
@@ -51,10 +49,56 @@ pub async fn collect_ethernet_report(
     })
     .await
     .map_err(|error| CoreError::internal(format!("Ethernet link worker: {error}")))??;
-    let probes = collect_icmp_report(link.interface.clone(), target)
+    let probes = collect_icmp_report(link.interface.clone(), address)
         .await
         .ok_or_else(|| CoreError::network_err(diagnostics::PROBE_BUSY))?;
-    Ok(EthernetReport { link, probes })
+    Ok(EthernetReport {
+        link,
+        probes,
+        hostname,
+    })
+}
+
+async fn resolve_target(target: String) -> Result<(Ipv4Addr, Option<String>), CoreError> {
+    let invalid = || CoreError::validation(diagnostics::ETHERNET_INVALID_TARGET);
+    if let Ok(address) = target.parse::<Ipv4Addr>() {
+        return external_unicast(address)
+            .then_some((address, None))
+            .ok_or_else(invalid);
+    }
+    if !valid_hostname(&target) {
+        return Err(invalid());
+    }
+
+    let unresolved = || CoreError::network_err(diagnostics::ETHERNET_TARGET_UNRESOLVED);
+    let address = tokio::time::timeout(DNS_TIMEOUT, tokio::net::lookup_host((target.as_str(), 0)))
+        .await
+        .map_err(|error| unresolved().with_tech(error.to_string()))?
+        .map_err(|error| unresolved().with_tech(error.to_string()))?
+        .find_map(|address| match address.ip() {
+            IpAddr::V4(address) if external_unicast(address) => Some(address),
+            _ => None,
+        })
+        .ok_or_else(unresolved)?;
+    Ok((address, Some(target)))
+}
+
+fn valid_hostname(target: &str) -> bool {
+    let hostname = target.strip_suffix('.').unwrap_or(target);
+    hostname.len() <= 253
+        && hostname
+            .rsplit('.')
+            .next()
+            .is_some_and(|label| label.bytes().any(|byte| byte.is_ascii_alphabetic()))
+        && hostname.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        })
 }
 
 fn read_links(root: &Path) -> io::Result<Vec<EthernetLink>> {
@@ -218,6 +262,41 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn validates_hostname_syntax() {
+        for hostname in ["www.yandex.ru", "Test-01.example.", "example"] {
+            assert!(valid_hostname(hostname), "{hostname}");
+        }
+        for invalid in [
+            "",
+            "https://example.org",
+            "example.org:443",
+            "-test.example",
+            "a..example",
+            "127.1",
+            "::1",
+        ] {
+            assert!(!valid_hostname(invalid), "{invalid}");
+        }
+    }
+
+    #[tokio::test]
+    async fn accepts_public_ipv4_and_rejects_local_targets() {
+        let address = Ipv4Addr::new(1, 1, 1, 1);
+        assert_eq!(
+            resolve_target(address.to_string()).await.unwrap(),
+            (address, None)
+        );
+        assert_eq!(
+            resolve_target("127.0.0.1".into()).await.unwrap_err().key,
+            diagnostics::ETHERNET_INVALID_TARGET
+        );
+        assert_eq!(
+            resolve_target("localhost".into()).await.unwrap_err().key,
+            diagnostics::ETHERNET_TARGET_UNRESOLVED
+        );
     }
 
     #[test]

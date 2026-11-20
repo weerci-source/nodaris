@@ -14,7 +14,7 @@ export type EthernetLink = {
     state: Measurement<LinkState>;
     speed_mbps: Measurement<number>;
 };
-export type EthernetReport = { link: EthernetLink; probes: ProbeReport };
+export type EthernetReport = { link: EthernetLink; probes: ProbeReport; hostname?: string };
 type Result<T> = { ok: true; value: T; historyError: ApiError | null } | { ok: false; error: ApiError };
 type Request = { interface: string; target: string };
 
@@ -96,7 +96,12 @@ export function listEthernetLinks(signal: AbortSignal): Promise<Result<EthernetL
 
 export function isEthernetReport(value: unknown): value is EthernetReport {
     return record(value) && isLink(value.link) && isProbeReport(value.probes) &&
-        value.probes.interface === value.link.interface;
+        value.probes.interface === value.link.interface && value.probes.external.target !== null &&
+        (value.hostname === undefined || (typeof value.hostname === "string" && value.hostname.length > 0));
+}
+
+export function ethernetTarget(report: EthernetReport): string | null {
+    return report.hostname ?? report.probes.external.target;
 }
 
 export function runEthernet(
@@ -106,6 +111,6 @@ export function runEthernet(
 ): Promise<Result<EthernetReport>> {
     return read(signal, (value): value is EthernetReport =>
         isEthernetReport(value) && value.link.interface === interfaceName &&
-        value.probes.external.target === target,
+        ethernetTarget(value) === target,
     { interface: interfaceName, target });
 }

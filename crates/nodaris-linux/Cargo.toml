@@ -7,4 +7,4 @@ edition = "2024"
 nodaris-core = { path = "../nodaris-core" }
 serde.workspace = true
 serde_json = { workspace = true, features = ["float_roundtrip"] }
-tokio = { workspace = true, features = ["io-util", "process", "time"] }
+tokio = { workspace = true, features = ["io-util", "net", "process", "time"] }

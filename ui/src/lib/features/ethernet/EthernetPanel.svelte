@@ -69,7 +69,8 @@
             links = links?.map((item) => item.interface === result.value.link.interface
                 ? result.value.link : item) ?? null;
             if (!saveError) onSaved();
-        } else if (result.error.key === "diagnostics_ethernet_invalid_target") {
+        } else if (result.error.key === "diagnostics_ethernet_invalid_target" ||
+            result.error.key === "diagnostics_ethernet_target_unresolved") {
             targetError = result.error;
         } else {
             runError = result.error;
@@ -135,8 +136,8 @@
                 </label>
                 <div class="ui-stack">
                     <label class="ui-field">
-                        <span>{t("probe_target")}</span>
-                        <input class="ui-control" type="text" inputmode="decimal" maxlength="15" required
+                        <span>{t("ethernet_target")}</span>
+                        <input class="ui-control" type="text" maxlength="254" autocapitalize="none" spellcheck={false} required
                             bind:this={targetInput} bind:value={target} disabled={running} aria-invalid={Boolean(targetError)}
                             aria-describedby={targetError ? `${id}-target-error` : undefined}
                             oninput={() => { targetError = null; }} />
@@ -156,7 +157,7 @@
         {#if saveError}{@render showError(saveError)}{/if}
         <section class="ui-stack ui-subsection" aria-labelledby={`${id}-probes`}>
             <h3 class="ui-title" id={`${id}-probes`}>{t("probe_title")}</h3>
-            <ProbeResult report={report.probes} />
+            <ProbeResult report={report.probes} hostname={report.hostname} />
         </section>
     {/if}
 </section>

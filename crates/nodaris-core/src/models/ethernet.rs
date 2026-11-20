@@ -21,4 +21,6 @@ pub struct EthernetLink {
 pub struct EthernetReport {
     pub link: EthernetLink,
     pub probes: IcmpReport,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hostname: Option<String>,
 }

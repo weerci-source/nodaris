@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { toApiError, type ApiError } from "../../i18n";
-import { isEthernetReport, type EthernetReport } from "../ethernet/ethernet-api";
+import { ethernetTarget, isEthernetReport, type EthernetReport } from "../ethernet/ethernet-api";
 import { decodeSession, type DiagnosticSession } from "../session/session-api";
 
 export type HistoryEntry =
@@ -18,7 +18,7 @@ function decodeEntry(value: unknown): HistoryEntry | null {
         return session?.id === id ? { id, kind, target, report: session } : null;
     }
     if (kind === "ethernet" && typeof target === "string" &&
-        isEthernetReport(report) && report.probes.external.target === target) {
+        isEthernetReport(report) && ethernetTarget(report) === target) {
         return { id, kind, target, report };
     }
     return null;

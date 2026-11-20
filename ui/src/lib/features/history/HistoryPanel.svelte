@@ -277,7 +277,7 @@
                         <EthernetLinkResult link={selected.report.link} />
                         <section class="ui-stack ui-subsection" aria-labelledby={`${id}-probes`}>
                             <h3 class="ui-title" id={`${id}-probes`}>{t("probe_title")}</h3>
-                            <ProbeResult report={selected.report.probes} />
+                            <ProbeResult report={selected.report.probes} hostname={selected.report.hostname} />
                         </section>
                     {/if}
                 {/key}

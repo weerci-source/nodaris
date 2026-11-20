@@ -4,7 +4,7 @@
     import { currentLang, t } from "../../i18n";
     import type { ProbeReport } from "./probe-api";
 
-    let { report }: { report: ProbeReport } = $props();
+    let { report, hostname }: { report: ProbeReport; hostname?: string } = $props();
     const id = $props.id();
     let expanded = $state<number | null>(null);
     let numberFormat = $derived(new Intl.NumberFormat(currentLang(), { maximumFractionDigits: 3 }));
@@ -24,7 +24,10 @@
             <h4 class="ui-title">{t(index === 0 ? "probe_gateway" : "probe_external")}</h4>
             <dl class="ui-metrics">
                 {#if series.target}
-                    <div><dt>{t("probe_destination")}</dt><dd>{series.target}</dd></div>
+                    <div>
+                        <dt>{t("probe_destination")}</dt>
+                        <dd>{index === 1 && hostname ? `${hostname} (${series.target})` : series.target}</dd>
+                    </div>
                 {/if}
                 {#if series.route}
                     <div>
